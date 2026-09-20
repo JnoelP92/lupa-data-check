@@ -1,0 +1,17 @@
+{
+  "name": "lupa-data-check",
+  "version": "0.1.0",
+  "description": "Read-only Lupa practice data audit: pull, rule, report.",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "lupa-check": "./bin/lupa-check"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}

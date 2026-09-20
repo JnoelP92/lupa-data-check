@@ -1,0 +1,7 @@
+{
+  "name": "lupa-data-check",
+  "version": "0.1.0",
+  "description": "Read-only audit of a Lupa practice: pulls every record type via the public API, runs the migration data-quality ruleset, and produces internal and client-facing reports.",
+  "author": { "name": "Lupa" },
+  "keywords": ["lupa", "migration", "data-quality", "audit", "veterinary"]
+}

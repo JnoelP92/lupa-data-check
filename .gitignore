@@ -1,0 +1,13 @@
+# Practice data. Never commit any of it — exports carry client PII and clinical notes.
+out/
+*.jsonl
+report.json
+report.md
+report-client.pdf
+*-findings.csv
+
+# Secrets
+.env
+
+node_modules/
+.DS_Store

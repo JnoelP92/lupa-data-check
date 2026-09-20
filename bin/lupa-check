@@ -1,0 +1,176 @@
+#!/usr/bin/env node
+// lupa-check — read-only audit of a Lupa practice.
+//
+//   lupa-check key                     stash this session's API key (hidden prompt)
+//   lupa-check whoami                  which practice does this key belong to?
+//   lupa-check pull    [--out DIR]     pull every record type to disk (resumable)
+//   lupa-check check   [--out DIR]     run the ruleset over a pull, write the report
+//   lupa-check run     [--out DIR]     pull then check
+//
+// Common flags:
+//   --env migrations|production        default: migrations
+//   --base <url>                       override the base URL entirely
+//   --company <uuid>                   required only if the key sees several companies
+//   --only clients,pets                pull a subset
+//   --since 2026-01-01                 updatedSince filter
+//   --verbose                          log every request
+//
+// `pull` is the only subcommand that touches the network. If it cannot reach Lupa —
+// a sandbox with closed egress, say — run it somewhere that can and point `check` at
+// the same directory. See README, "When egress is closed".
+import { mkdirSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createInterface } from 'node:readline';
+import { Api } from '../src/api.js';
+import { resolveToken, storeToken } from '../src/token.js';
+import { pull, resolveContext } from '../src/pull.js';
+import { ENVIRONMENTS } from '../src/collections.js';
+import { buildContext, runRules } from '../src/rules/index.js';
+import { buildReport, writeReport } from '../src/report.js';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+function parseArgs(argv) {
+  const out = { _: [] };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a.startsWith('--')) {
+      const [flag, inline] = a.slice(2).split('=');
+      const next = inline ?? (argv[i + 1]?.startsWith('--') ? true : argv[++i] ?? true);
+      out[flag] = next;
+    } else out._.push(a);
+  }
+  return out;
+}
+
+function usage() {
+  console.log(`lupa-check — read-only audit of a Lupa practice
+
+  lupa-check key                     stash this session's API key
+  lupa-check whoami                  which practice does this key belong to?
+  lupa-check pull    [--out DIR]     pull every record type to disk (resumable)
+  lupa-check check   [--out DIR]     run the ruleset, write report.json + report.md
+  lupa-check run     [--out DIR]     pull then check
+
+  --env migrations|production   default: migrations
+  --company <uuid>              only if the key sees several companies
+  --only clients,pets           pull a subset
+  --since 2026-01-01            updatedSince filter
+  --verbose`);
+}
+
+function promptHidden(label) {
+  return new Promise((resolve) => {
+    const rl = createInterface({ input: process.stdin, output: process.stderr, terminal: true });
+    let muted = false;
+    rl._writeToOutput = (s) => { if (!muted) process.stderr.write(s); };
+    rl.question(label, (answer) => { rl.close(); process.stderr.write('\n'); resolve(answer); });
+    muted = true;
+  });
+}
+
+async function readKeyFromStdin() {
+  if (process.stdin.isTTY) return (await promptHidden('Lupa API key (input hidden): ')).trim();
+  const chunks = [];
+  for await (const c of process.stdin) chunks.push(c);
+  return chunks.join('').trim();
+}
+
+function makeApi(args, token) {
+  const baseUrl = args.base ?? ENVIRONMENTS[args.env ?? 'migrations'];
+  if (!baseUrl) throw new Error(`Unknown --env "${args.env}". Use migrations or production, or pass --base.`);
+  return new Api({ baseUrl, token, verbose: Boolean(args.verbose) });
+}
+
+function requireToken() {
+  const token = resolveToken(ROOT);
+  if (!token) {
+    console.error('No Lupa API key for this session. Run: lupa-check key');
+    process.exit(1);
+  }
+  return token;
+}
+
+function outDir(args) {
+  const dir = resolve(String(args.out ?? join(ROOT, 'out')));
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+const args = parseArgs(process.argv.slice(2));
+const command = args._[0];
+
+try {
+  switch (command) {
+    case 'key': {
+      const key = await readKeyFromStdin();
+      if (!key) throw new Error('No key given.');
+      // Verify before storing. A rejected key is never written, so a stale key can
+      // never silently survive into the next session.
+      const api = makeApi(args, key);
+      const { company, stores } = await resolveContext(api, { companyId: args.company });
+      const where = storeToken(ROOT, key);
+      console.log(`Key verified against ${api.baseUrl}`);
+      console.log(`Practice: ${company.name}`);
+      console.log(`Stores:   ${stores.map((s) => s.name ?? s.id).join(', ') || 'none'}`);
+      console.log(`Stored in ${where}`);
+      break;
+    }
+
+    case 'whoami': {
+      const api = makeApi(args, requireToken());
+      const { company, stores } = await resolveContext(api, { companyId: args.company });
+      console.log(`${company.name}  (companyId ${company.id})`);
+      console.log(`Environment: ${api.baseUrl}`);
+      for (const s of stores) console.log(`  store ${s.id}  ${s.name}`);
+      break;
+    }
+
+    case 'pull': {
+      const api = makeApi(args, requireToken());
+      await pull(api, outDir(args), {
+        companyId: args.company,
+        only: typeof args.only === 'string' ? args.only.split(',') : undefined,
+        since: typeof args.since === 'string' ? args.since : undefined,
+      });
+      break;
+    }
+
+    case 'check': {
+      const dir = outDir(args);
+      const ctx = buildContext(dir);
+      const sections = runRules(ctx);
+      const report = buildReport(ctx, sections);
+      const paths = writeReport(dir, report);
+      console.error('');
+      for (const s of report.summary) {
+        console.error(`  ${s.category.padEnd(18)} scanned ${String(s.scanned).padStart(7)}   critical ${String(s.critical).padStart(5)}   review ${String(s.review).padStart(5)}   info ${String(s.info).padStart(5)}${s.skipped ? `   (${s.skipped} skipped)` : ''}`);
+      }
+      console.error(`\nWrote ${paths.md} and ${paths.json}`);
+      break;
+    }
+
+    case 'run': {
+      const api = makeApi(args, requireToken());
+      const dir = outDir(args);
+      await pull(api, dir, {
+        companyId: args.company,
+        only: typeof args.only === 'string' ? args.only.split(',') : undefined,
+        since: typeof args.since === 'string' ? args.since : undefined,
+      });
+      const ctx = buildContext(dir);
+      const report = buildReport(ctx, runRules(ctx));
+      const paths = writeReport(dir, report);
+      console.error(`\nWrote ${paths.md} and ${paths.json}`);
+      break;
+    }
+
+    default:
+      usage();
+      process.exit(command ? 1 : 0);
+  }
+} catch (err) {
+  console.error(`\n${err.message}`);
+  process.exit(1);
+}
