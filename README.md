@@ -45,6 +45,30 @@ The key is stored under its own keychain slot (`lupa-data-check`), not the one
 `api-upload-tool` uses. The two tools default to different environments, and a shared
 slot means one silently running with the other's key.
 
+## Installing without an admin
+
+The marketplace route needs admin access to the plugin repo on GitHub, checked through
+each person's own GitHub connection — so it works for whoever owns the repo and nobody
+else. Private marketplace repos are also a known sore point
+([#61271](https://github.com/anthropics/claude-code/issues/61271)).
+
+Skills do not work that way. A custom skill is uploaded per user, is private to that
+account, and is explicitly not centrally managed — no admin involved:
+
+```bash
+npm run package:skill      # writes dist/lupa-data-check.zip and dist/lupa-live-config.zip
+```
+
+Upload each at **Settings → Capabilities → Skills → Add skill**. Needs a paid plan with
+code execution enabled.
+
+Each bundle carries the whole tool, not just SKILL.md, so `check` and `deliverables` run
+straight from it with nothing cloned and nothing installed. Only `pull` has to happen
+elsewhere, because only `pull` needs to reach Lupa.
+
+Re-run `package:skill` and re-upload when the rules change. That is the cost of avoiding
+the admin conversation: updates are manual, per person.
+
 ## When egress is closed
 
 Cowork runs code in a VM behind an egress proxy. Unless an admin has opened

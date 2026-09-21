@@ -24,7 +24,15 @@ Use `lupa-data-check` for the first pass. This skill assumes that already happen
 ## Running it
 
 ```bash
-bin/lupa-check run --env production --only products,services,bundles,healthPlans
+node "<this skill's directory>/bin/lupa-check" run --env production \
+  --only products,services,bundles,healthPlans
+```
+
+If the sandbox cannot reach Lupa — the normal case — the user runs the pull in their own
+terminal and you pick up from `check`:
+
+```bash
+npx github:JnoelP92/lupa-data-check pull --env production --out <their folder>/out
 ```
 
 Add `--only clients,pets` only if the user has asked for a re-check of records rather

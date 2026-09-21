@@ -13,7 +13,8 @@
   "scripts": {
     "test": "node --test",
     "check:fields": "node scripts/check-fields.js",
-    "sync:spec": "node scripts/sync-spec.js"
+    "sync:spec": "node scripts/sync-spec.js",
+    "package:skill": "node scripts/package-skill.js"
   },
   "license": "UNLICENSED",
   "private": true,

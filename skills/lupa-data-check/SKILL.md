@@ -33,18 +33,35 @@ Either route is fine. Pasted into the chat is acceptable — stash it via stdin,
 an argument:
 
 ```bash
-node bin/lupa-check key <<'EOF'
+node "$LC" key <<'EOF'
 <the key>
 EOF
 ```
 
-Or have the user run `bin/lupa-check key` themselves for a hidden prompt. Either way the
+Or have the user run `lupa-check key` themselves for a hidden prompt. If the pull is
+happening outside the sandbox, the key needs to be stashed out there too — it is stored
+per machine, and the sandbox's copy dies with the session. Either way the
 key is verified against `GET /v1/companies` first and a rejected key is never stored.
+
+## Finding the tool
+
+The CLI ships inside this skill bundle, beside this file: `bin/lupa-check`. Resolve it
+once at the start of the session and reuse it — the skill directory is wherever this
+SKILL.md was loaded from:
+
+```bash
+LC="<this skill's directory>/bin/lupa-check"
+node "$LC" --help
+```
+
+If the user has the repo open as their project folder instead, `bin/lupa-check` from
+that folder is the same tool and is preferable, because it is the one they can update
+with `git pull`.
 
 ## Running the pass
 
 ```bash
-bin/lupa-check run --env migrations          # pull, then rules, then report
+node "$LC" run --env migrations          # pull, then rules, then report
 ```
 
 `pull` is resumable — if it stops, run it again and it continues from the checkpoint
@@ -54,9 +71,17 @@ which is free and is what you do after every rule change.
 Expect the pull to take a while on a real practice. It is paced at 80 requests/minute
 against Lupa's 100/min limit.
 
-**If the pull cannot reach Lupa** you are probably in a sandbox with closed egress. Do
-not work around it. See README, "When egress is closed" — the fix is to run the pull
-outside the sandbox and point `check` at the same directory.
+**If the pull cannot reach Lupa**, you are in a sandbox with closed egress. This is the
+normal case today, not a fault. Do not try to work around the proxy. Instead, give the
+user this to run in their own terminal, outside the sandbox:
+
+```bash
+npx github:JnoelP92/lupa-data-check key
+npx github:JnoelP92/lupa-data-check pull --env migrations --out <their folder>/out
+```
+
+Then carry on from `check` against that folder. Everything after the pull — rules,
+report, client PDF, Dock copy, email, Linear — needs no network to Lupa at all.
 
 ## Reading the report
 
@@ -90,7 +115,7 @@ Write the user's verdict per finding into `out/verdicts.json`:
 puts it in the Linear export. Then:
 
 ```bash
-bin/lupa-check deliverables --contact "<their name>" --from "<your name>"
+node "$LC" deliverables --out <their folder>/out --contact "<their name>" --from "<your name>"
 ```
 
 That writes all four at once. What each is for:
