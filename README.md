@@ -9,9 +9,14 @@ client.
 
 ## Two ways to use it
 
-**In Cowork**, as a plugin. Customize → Plugins → Add marketplace → this repo's URL →
-install. The skills then fire on their own, and the whole pass — pull, review, client
-report, Dock copy, draft email, Linear tickets — happens in one session.
+**In Cowork**, as a plugin. Customize → Plugins → Add marketplace →
+`JnoelP92/lupa-data-check` → Sync → Install. The skills then fire on their own, and the
+whole pass — pull, review, client report, Dock copy, draft email, Linear tickets —
+happens in one session.
+
+**Or open this folder as a project** in Claude Code. `.claude/skills` is a symlink to
+`skills/`, so the same skills load with no install step. That is the fallback if the
+marketplace cannot fetch a private repo.
 
 **As a plain CLI**, anywhere with Node and network access to Lupa:
 
