@@ -1,14 +1,13 @@
 {
-  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "lupa-tools",
-  "description": "Lupa internal tooling for practice onboarding and data quality",
+  "name": "lupa-data-check",
   "owner": { "name": "Lupa" },
   "plugins": [
     {
       "name": "lupa-data-check",
-      "description": "Read-only audit of a Lupa practice: pulls every record type via the public API, runs the migration data-quality ruleset, and produces internal and client-facing reports.",
-      "source": "./",
-      "category": "productivity"
+      "displayName": "Lupa Data Check",
+      "description": "Read-only audit of a Lupa practice: pulls every record type via the public API, runs the migration data-quality ruleset, and produces the internal findings report plus the client-facing report, Dock copy, draft email and Linear tickets.",
+      "category": "productivity",
+      "source": "./"
     }
   ]
 }
