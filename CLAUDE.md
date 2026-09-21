@@ -13,6 +13,12 @@ while the review happens somewhere without it (a Cowork sandbox with closed egre
 
 - **Read-only, always.** There is no `put()` on the API client. Do not add one. Fixes go
   through the practice or through `api-upload-tool` as a separate reviewed change.
+- **Referential rules are set membership, never a per-record GET.** `src/indexes.js`
+  streams each collection once into identity sets. A `GET /v1/pet/{id}` per invoice line
+  would be days of requests against a 100/min limit.
+- **One defect, one finding.** Where a rule is strictly a special case of another,
+  suppress the narrower one — a negative refill limit is not also over-dispensing.
+  Genuine overlaps (free *and* below cost) are fine and are documented in the ruleset.
 - **A skipped rule is not a passing rule.** If a reference set fails to load, the rules
   depending on it are recorded in `skipped` and the report says so at the top. Never let
   an unavailable dependency render as a clean pass.
@@ -37,8 +43,17 @@ returns `{ record, display, fields, reason?, groupKey? }`.
 `needs` names a reference set; if the pull could not read it, the rule is skipped rather
 than run. Use it on every referential rule.
 
-Add fixtures to `test/fixture.js` in the same commit — one record per rule, so a
-regression names the rule.
+Add fixtures to `test/fixture.js` in the same commit — one record per rule, and add it
+to the `EXPECTED` map in `test/rules.test.js` so a regression names the rule. Give the
+new record its own identity (its own date, its own microchip) or it will collide with a
+neighbouring rule and the failure will point at the wrong thing.
+
+## Client-facing output
+
+`src/redact.js` decides what a client may see: Info and `internalOnly` findings are
+dropped, UUIDs and internal reference fields are stripped, `clientFacing` wording
+replaces the internal title. Anything new that could leak internal config belongs in
+that file, not in the renderer.
 
 ## Checks
 

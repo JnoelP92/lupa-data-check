@@ -70,7 +70,11 @@ export function renderMarkdown(report) {
         if (out[out.length - 1] !== '') out.push('');
         out.push(`**${item.label}**`);
         out.push('');
-        out.push(mdTable(['Value', 'Count'], item.breakdown.map((b) => [b.label, b.count])));
+        const hasExtra = item.breakdown.some((b) => b.extra !== undefined);
+        out.push(mdTable(
+          hasExtra ? ['Value', 'Count', 'Value £'] : ['Value', 'Count'],
+          item.breakdown.map((b) => (hasExtra ? [b.label, b.count, b.extra ?? ''] : [b.label, b.count])),
+        ));
         out.push('');
       } else {
         out.push(`- ${item.label}: **${item.value}**`);
@@ -99,7 +103,7 @@ export function renderMarkdown(report) {
           const fieldKeys = [...new Set(finding.rows.flatMap((r) => Object.keys(r.fields)))];
           const headers = ['Name', ...fieldKeys, ...(finding.grouped ? ['Shared with'] : []), 'Open in Lupa'];
           out.push(mdTable(headers, finding.rows.map((r) => {
-            const l = link(section.linkType, { id: r.id, ...r.fields });
+            const l = link(finding.linkType ?? section.linkType, { id: r.id, ...r.fields });
             const open = l.url ? `[Open ↗](${l.url})${l.search ? ` — search \`${l.search}\`` : ''}` : '—';
             return [r.display, ...fieldKeys.map((k) => r.fields[k]), ...(finding.grouped ? [r.reason ?? ''] : []), open];
           })));

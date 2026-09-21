@@ -19,7 +19,22 @@ report, Dock copy, draft email, Linear tickets — happens in one session.
 bin/lupa-check key                   # hidden prompt, verified before it is stored
 bin/lupa-check whoami                # which practice is this key for?
 bin/lupa-check run --env migrations  # pull, rules, report
+bin/lupa-check deliverables          # client report, Dock copy, email, tickets
 ```
+
+`deliverables` reads an optional `verdicts.json` next to the report, written after the
+deployment team has been through the findings:
+
+```json
+{
+  "clients.email.malformed": { "include": true, "ticket": true, "note": "before go-live" },
+  "products.cost.unknown":   { "include": false }
+}
+```
+
+Without it, every Critical and Review finding is included and no tickets are produced.
+Nothing is ever sent or filed from here — the email is a draft and the Linear export is
+a file.
 
 ## When egress is closed
 
@@ -70,6 +85,10 @@ out/
   .checkpoint/         cursor + line count per collection, for resume
   report.json          every count and every flagged row
   report.md            the same, for a human
+  report-client.html   client-facing version — print this to PDF
+  dock-copy.txt        plain text for the Dock data-findings box
+  client-email.txt     draft email, for a human to send
+  linear-tickets.json  only the findings marked for a ticket
 ```
 
 Everything under `out/` is gitignored. Practice exports carry client PII and clinical
@@ -82,13 +101,29 @@ redacted sample will do.
 npm test
 ```
 
-Nine tests against a synthetic practice built in `test/fixture.js`. No key, no network.
-Every seeded client exists to trip exactly one rule, so a failure names a line rather
-than a feeling.
+42 tests against a synthetic practice in `test/fixture.js`: every record exists to trip
+a named rule, so a failure names a rule rather than shifting a count somewhere
+downstream. Control records (`c0001`, `p01`, `pr01`, …) are asserted never to appear in
+any finding. No key, no network.
+
+## What the client never sees
+
+`src/redact.js` is the whole of it: Info findings, rules marked `internalOnly`, raw
+UUIDs and internal reference fields are stripped, and softened wording replaces the
+internal rule title. That is one file to read if you want to know whether something
+leaks.
 
 ## Status
 
-Clients is implemented end to end. The other twelve categories are specified in
-`references/ruleset-v1.md` and not yet coded — and the report says so rather than
-showing them as clean. Four open questions in that file need answering before the
-financial categories can ship.
+All 19 rule modules are implemented — 228 rules covering every category in the spec.
+Three specified rules cannot be built against the current API and are named in
+`references/ruleset-v1.md` rather than quietly omitted.
+
+Two things to do before trusting a real run:
+
+1. **Validate the invoice and client-balance formulas** against known-good records, as
+   the spec says. They are the rules most likely to produce a wall of false Criticals
+   at a practice whose bundle pricing differs from the assumption.
+2. **Check for rules that fire zero times across a large collection.** Field names come
+   from the spec document, not from a live response, and a field that does not exist
+   looks exactly like a clean pass.

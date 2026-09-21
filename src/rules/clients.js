@@ -25,8 +25,7 @@ export default {
   label: 'Clients',
   linkType: 'client',
 
-  tally(ctx) {
-    const rows = ctx.clients;
+  tally(ctx, rows) {
     const storeNames = ctx.storeNames;
     const withBalance = rows.filter((c) => Number(c.balance ?? 0) !== 0);
     const inCredit = rows.filter((c) => Number(c.balance ?? 0) < 0);
@@ -63,7 +62,7 @@ export default {
       severity: 'review',
       title: 'Active client with no email address',
       why: 'Cannot be reached by any email comms — reminders, invoices, confirmations.',
-      run: (ctx) => ctx.clients.filter((c) => live(c) && isBlank(c.email)).map((c) => ({
+      run: (ctx, rows) => rows.filter((c) => live(c) && isBlank(c.email)).map((c) => ({
         record: c,
         display: fullName(c),
         fields: { numericId: c.numericId, phone: c.phone, store: ctx.storeNames.get(c.primaryStoreId) ?? c.primaryStoreId },
@@ -74,7 +73,7 @@ export default {
       severity: 'review',
       title: 'Active client with no phone number',
       why: 'Cannot be reached by SMS or call.',
-      run: (ctx) => ctx.clients.filter((c) => live(c) && isBlank(c.phone)).map((c) => ({
+      run: (ctx, rows) => rows.filter((c) => live(c) && isBlank(c.phone)).map((c) => ({
         record: c,
         display: fullName(c),
         fields: { numericId: c.numericId, email: c.email, store: ctx.storeNames.get(c.primaryStoreId) ?? c.primaryStoreId },
@@ -86,7 +85,7 @@ export default {
       title: 'Email address fails the API’s own validation',
       clientFacing: 'Email address does not look valid.',
       why: 'Accepted by an import path that did not validate. Will fail on first send.',
-      run: (ctx) => ctx.clients.filter((c) => !isBlank(c.email) && !EMAIL.test(c.email.trim())).map((c) => ({
+      run: (ctx, rows) => rows.filter((c) => !isBlank(c.email) && !EMAIL.test(c.email.trim())).map((c) => ({
         record: c,
         display: fullName(c),
         fields: { numericId: c.numericId, email: c.email },
@@ -97,7 +96,7 @@ export default {
       severity: 'review',
       title: 'Phone number looks like a placeholder',
       clientFacing: 'Phone number does not look like a real number.',
-      run: (ctx) => ctx.clients.filter((c) => {
+      run: (ctx, rows) => rows.filter((c) => {
         if (isBlank(c.phone)) return false;
         const digits = c.phone.replace(/\D/g, '');
         return digits.length < 7 || PLACEHOLDER_PHONE.some((re) => re.test(digits));
@@ -111,7 +110,7 @@ export default {
       id: 'clients.dob.implausible',
       severity: 'review',
       title: 'Date of birth is in the future or before 1900',
-      run: (ctx) => ctx.clients.filter((c) => {
+      run: (ctx, rows) => rows.filter((c) => {
         const d = parseDate(c.dob);
         return d && (d > ctx.now || d.getUTCFullYear() < 1900);
       }).map((c) => ({
@@ -124,7 +123,7 @@ export default {
       id: 'clients.address.missing',
       severity: 'info',
       title: 'Active client with no address line 1',
-      run: (ctx) => ctx.clients.filter((c) => live(c) && isBlank(c.address?.line_1)).map((c) => ({
+      run: (ctx, rows) => rows.filter((c) => live(c) && isBlank(c.address?.line_1)).map((c) => ({
         record: c,
         display: fullName(c),
         fields: { numericId: c.numericId },
@@ -136,7 +135,7 @@ export default {
       title: 'Two or more clients share an email address',
       why: 'Comms go to the wrong household, and merging after go-live is manual.',
       group: true,
-      run: (ctx) => collisions(ctx.clients, (c) => lower(c.email)).flatMap(([key, group]) =>
+      run: (ctx, rows) => collisions(rows, (c) => lower(c.email)).flatMap(([key, group]) =>
         group.map((c) => ({
           record: c,
           display: fullName(c),
@@ -152,7 +151,7 @@ export default {
       title: 'Two or more clients share a phone number',
       why: 'Often a real duplicate record, but households legitimately share a landline — needs a look.',
       group: true,
-      run: (ctx) => collisions(ctx.clients, (c) => phoneKey(c.phone)).flatMap(([key, group]) =>
+      run: (ctx, rows) => collisions(rows, (c) => phoneKey(c.phone)).flatMap(([key, group]) =>
         group.map((c) => ({
           record: c,
           display: fullName(c),
@@ -167,8 +166,8 @@ export default {
       severity: 'review',
       title: 'Two or more clients share name and date of birth',
       group: true,
-      run: (ctx) => collisions(
-        ctx.clients.filter((c) => !isBlank(c.dob)),
+      run: (ctx, rows) => collisions(
+        rows.filter((c) => !isBlank(c.dob)),
         (c) => `${lower(c.firstName)}|${lower(c.lastName)}|${c.dob}`,
       ).flatMap(([key, group]) =>
         group.map((c) => ({
@@ -185,7 +184,7 @@ export default {
       title: 'Client with a non-zero balance',
       why: 'The per-client view of the aged-debt figure. Not an error on its own.',
       truncate: 10,
-      run: (ctx) => ctx.clients
+      run: (ctx, rows) => rows
         .filter((c) => Number(c.balance ?? 0) !== 0)
         .sort((a, b) => Math.abs(Number(b.balance ?? 0)) - Math.abs(Number(a.balance ?? 0)))
         .map((c) => ({
@@ -204,7 +203,7 @@ export default {
       title: 'Primary store is not a store on this company',
       clientFacing: 'Client is linked to a location that no longer exists.',
       needs: 'stores',
-      run: (ctx) => ctx.clients.filter((c) => !isBlank(c.primaryStoreId) && !ctx.storeIds.has(c.primaryStoreId)).map((c) => ({
+      run: (ctx, rows) => rows.filter((c) => !isBlank(c.primaryStoreId) && !ctx.storeIds.has(c.primaryStoreId)).map((c) => ({
         record: c,
         display: fullName(c),
         fields: { numericId: c.numericId, primaryStoreId: c.primaryStoreId },
@@ -215,7 +214,7 @@ export default {
       severity: 'critical',
       title: 'Payment terms reference does not resolve',
       needs: 'paymentTerms',
-      run: (ctx) => ctx.clients.filter((c) => !isBlank(c.paymentTermsId) && !ctx.paymentTermIds.has(c.paymentTermsId)).map((c) => ({
+      run: (ctx, rows) => rows.filter((c) => !isBlank(c.paymentTermsId) && !ctx.paymentTermIds.has(c.paymentTermsId)).map((c) => ({
         record: c,
         display: fullName(c),
         fields: { numericId: c.numericId, paymentTermsId: c.paymentTermsId },
@@ -225,7 +224,7 @@ export default {
       id: 'clients.contacts.noRoute',
       severity: 'info',
       title: 'Additional contact with neither email nor phone',
-      run: (ctx) => ctx.clients.flatMap((c) =>
+      run: (ctx, rows) => rows.flatMap((c) =>
         (c.contacts ?? [])
           .filter((k) => isBlank(k.email) && isBlank(k.phone))
           .map((k) => ({

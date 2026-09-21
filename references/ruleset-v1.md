@@ -13,26 +13,53 @@ Severity means:
 
 ## Implementation status
 
-| Category | Spec | Implemented | Notes |
+228 rules across 19 modules. Every category in the spec is implemented.
+
+| Category | Module | Rules | Notes |
 |---|---|---|---|
-| 6.1 Clients | yes | **yes** | Balance-vs-history reconciliation deferred to 6.11.6 |
-| 6.2 Pets | yes | no | |
-| 6.3 Appointments | yes | no | `roomId` rule has no endpoint — see Open questions |
-| 6.4 Products | yes | no | |
-| 6.5 Services | yes | no | |
-| 6.6 Bundles | yes | no | Composition only derivable via invoices |
-| 6.7 Reminders | yes | no | Definitions only; pet-level instances not exposed |
-| 6.8 Clinical notes | yes | no | |
-| 6.9 Medical records | yes | no | |
-| 6.10 Prescriptions | yes | no | |
-| 6.11 Financials | yes | no | Both money formulas need validating first |
-| 6.12 Health plans | yes | no | |
-| 6.13 Employees | yes | no | |
-| 7 Cross-record | yes | no | Must be set-membership, never per-record GETs |
+| 6.1 Clients | `clients.js` | 13 | Balance reconciliation lives in cross-record |
+| 6.2 Pets | `pets.js` | 16 | |
+| 6.3 Appointments | `appointments.js` | 19 | `roomId` rule dropped — no endpoint, see Open questions |
+| 6.4 Products | `products.js` | 31 | Batch expiry deferred — needs a per-record detail GET |
+| 6.5 Services | `services.js` | 12 | |
+| 6.6 Bundles | `bundles.js` | 7 | Composition check lives in cross-record |
+| 6.7 Reminders | `reminders.js` | 7 | Definitions only; pet-level instances not exposed |
+| 6.8 Clinical notes | `clinical-notes.js` | 10 | |
+| 6.9 Medical records | `medical-records.js` | 9 | |
+| 6.10 Prescriptions | `prescriptions.js` | 19 | |
+| 6.11.1 Invoices | `invoices.js` | 25 | Reconciliation formula needs validating — see below |
+| 6.11.2 Payments | `payments.js` | 7 | |
+| 6.11.3 Credit notes | `credit-notes.js` | 8 | `amount` is a string; parsed at the edge |
+| 6.11.4 Refunds | `refunds.js` | 7 | |
+| 6.11.5 Estimates | `estimates.js` | 5 | |
+| 6.12.1 Health plans | `health-plans.js` | 7 | |
+| 6.12.2 Subscriptions | `subscriptions.js` | 11 | |
+| 6.13 Employees | `employees.js` | 9 | |
+| 7 + 6.11.6 Cross-record | `cross-record.js` | 6 | Set-membership only, never per-record GETs |
 
-A category marked "no" has **not run**. It must never be rendered as a clean pass.
+### Not implemented, and why
 
-## 6.1 Clients — implemented
+Three rules in the spec cannot be built against the current public API. They are listed
+here rather than silently omitted, so nobody reads their absence as a pass.
+
+- **Appointment `roomId` resolves to a room.** There is no rooms endpoint.
+- **Deceased pet with an active reminder.** `/v1/reminders` returns reminder
+  *definitions*, not pet-level scheduled instances. The deceased-pet check is covered
+  for health plan subscriptions, where the data does exist.
+- **Expired batch still in stock.** Batch expiry dates are only on the per-product
+  detail response, so checking them means one GET per product. That breaks the
+  set-membership rule below and is not worth the request budget until the list response
+  carries expiry.
+
+### Overlapping rules
+
+Some records trip more than one rule, and that is intended: a product priced at zero
+with a real procurement cost is both "free but sellable" and "below cost", and both
+framings are useful to a reviewer. Where one rule is strictly a special case of another
+the narrower one is suppressed — a negative refill limit is not also reported as
+over-dispensing, and a dangling client is not also reported as not owning its pet.
+
+## 6.1 Clients
 
 Endpoints: `GET /v1/clients`, `POST /v1/clients/search`, `GET /v1/client/{id}`
 
@@ -71,11 +98,9 @@ longer exists" — the practice does not know what a `primaryStoreId` is.
 
 These need answering before the categories that depend on them are coded.
 
-1. **`/v1/rooms` does not exist.** The appointments spec has a rule "`roomId` is not
-   null but returns 404 on rooms lookup". There is no rooms endpoint in the
-   2026-09-14 API snapshot. Either the rule drops, or it needs a different source.
-   `/v1/payment-terms`, `/v1/reference-lists` and `/v1/appointment-statuses` do all
-   exist and are pulled.
+1. **`/v1/rooms` does not exist.** The appointments rule "`roomId` returns 404 on
+   rooms lookup" has been dropped. `/v1/payment-terms`, `/v1/reference-lists` and
+   `/v1/appointment-statuses` do all exist and are pulled.
 
 2. **Invoice reconciliation must be validated before it ships.** The
    `expectedTotal` formula (line sum, then invoice-level discount) needs checking
@@ -87,11 +112,14 @@ These need answering before the categories that depend on them are coded.
    clients. The open question is whether refundable credits reduce `balance`, which
    changes the sign of `additionalCreditAmount` in the expression.
 
-4. **Cross-record checks must be set-based.** "`petId` returns 404" across every
-   appointment and invoice line would be hundreds of thousands of requests against a
-   100/min limit. Load the ID sets once from the pull, then check membership. This is
-   a correctness-of-approach constraint, not an optimisation.
+4. **Cross-record checks are set-based, and must stay that way.** `src/indexes.js`
+   streams each collection once into identity sets; a referential rule is a
+   `Set.has()`. Reintroducing a per-record GET would turn a ten-minute run into a
+   multi-day one against the 100/min limit. This is a correctness-of-approach
+   constraint, not an optimisation.
 
-5. **Reminders are definitions, not instances.** "Deceased pet with an active
-   reminder" needs pet-level scheduled reminders, which the public API does not
-   expose. The rule cannot be implemented as specified.
+5. **Field names come from the spec document, not from a live response.** Every rule
+   reads fields as the ruleset document names them. The first run against a real
+   practice should be diffed against `report.json` for rules that fire zero times
+   across a large collection — that is the signature of a field name that does not
+   exist, and it looks identical to a clean pass.

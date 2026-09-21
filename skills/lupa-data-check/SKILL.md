@@ -78,22 +78,36 @@ everything below.
 
 ## After the review
 
-Only once the user has signed off on the findings:
+Write the user's verdict per finding into `out/verdicts.json`:
 
-- **Client-facing report.** Section 5 rules: strip UUIDs, strip Info entirely, strip
-  rules that expose internal config, soften the language, keep every "Open in Lupa"
-  link, keep the reconciliation totals. Frame findings as questions where a decision is
-  the practice's to make. Summary page with contents links, then one page per record
-  type, link back to summary on each, Lupa logo and company name at the top.
-- **Dock copy.** A stripped-down plain-text version for the data findings box on the
-  migration page. No tables, no links, no UUIDs.
-- **Client email.** Draft only — never send. Addressed to the practice contact, saying
-  the findings from the first pass are attached and asking them to use it to shape their
-  review.
-- **Linear tickets.** Ask first, and only for findings the user picked during the manual
-  review. Never bulk-file the report.
+```json
+{
+  "<ruleId>": { "include": true, "ticket": false, "note": "their words, not yours" }
+}
+```
 
-Save the deliverables into the project folder next to `out/`, not into chat.
+`include: false` removes a finding from every client-facing deliverable. `ticket: true`
+puts it in the Linear export. Then:
+
+```bash
+bin/lupa-check deliverables --contact "<their name>" --from "<your name>"
+```
+
+That writes all four at once. What each is for:
+
+- **`report-client.html`** — the client-facing report. Redaction is enforced in code
+  (`src/redact.js`), so you do not have to police it by hand. Print it to PDF for the
+  client; it is already laid out for A4 with a contents page and per-section links back
+  to the summary.
+- **`dock-copy.txt`** — plain text for the data findings box on the Dock migration page.
+- **`client-email.txt`** — a draft. **Never send it.** Give it to the user to read, edit
+  and send themselves.
+- **`linear-tickets.json`** — only the findings marked `ticket: true`. Ask before
+  creating any of them, and never bulk-file the report.
+
+Check the client report before handing it over. If anything in it would confuse a
+practice manager, that is a wording problem to fix in the rule's `clientFacing` string,
+not something to paper over in the moment.
 
 ## Rules
 

@@ -1,101 +1,176 @@
-// The rule engine. Loads a pull from disk, builds the shared context every rule reads,
-// and runs each module's tally and rules.
+// The rule engine.
 //
-// Two things here matter more than they look:
+// Order of operations:
+//   1. read the reference sets and meta from the pull
+//   2. stream every collection once to build identity indexes (src/indexes.js)
+//   3. for each module: load its collection, run tally + rules, release it
 //
-//   - `needs`. A rule that depends on a reference set which the key could not read is
-//     recorded as *skipped*, not as zero hits. A skipped rule that renders as a clean
-//     pass is worse than no rule at all.
-//   - `truncate`. Some rules legitimately match thousands of rows. The report shows the
-//     first N and states the true total, so a section stays readable without anyone
-//     being misled about scale.
+// Step 3 is why a large practice fits in memory. Only one big collection is resident at
+// a time; cross-record rules use the indexes from step 2 rather than holding two.
+//
+// Two behaviours are load-bearing:
+//   - `needs`. A rule depending on a reference set the key could not read is recorded
+//     as *skipped*, never as zero hits. A skipped rule that renders as a clean pass is
+//     worse than no rule at all.
+//   - `truncate`. Rules that legitimately match thousands of rows show the first N and
+//     state the true total, so a section stays readable without misleading anyone.
 import { Store } from '../store.js';
-import clients from './clients.js';
+import { buildIndexes } from '../indexes.js';
 
-export const MODULES = [clients];
+import clients from './clients.js';
+import pets from './pets.js';
+import appointments from './appointments.js';
+import products from './products.js';
+import services from './services.js';
+import bundles from './bundles.js';
+import healthPlans from './health-plans.js';
+import subscriptions from './subscriptions.js';
+import reminders from './reminders.js';
+import medicalRecords from './medical-records.js';
+import clinicalNotes from './clinical-notes.js';
+import prescriptions from './prescriptions.js';
+import invoices from './invoices.js';
+import payments from './payments.js';
+import creditNotes from './credit-notes.js';
+import refunds from './refunds.js';
+import estimates from './estimates.js';
+import employees from './employees.js';
+import crossRecord from './cross-record.js';
+
+// Ordered by severity impact, not alphabetically: financials and pets first, reminders
+// and clinical notes near the end, per section 8.
+export const MODULES = [
+  invoices, payments, creditNotes, refunds, estimates,
+  clients, pets, appointments,
+  products, services, bundles,
+  healthPlans, subscriptions,
+  prescriptions, medicalRecords,
+  employees, reminders, clinicalNotes,
+  crossRecord,
+];
 
 export const SEVERITIES = ['critical', 'review', 'info'];
 
-export function buildContext(dir, { now = new Date() } = {}) {
+export function buildContext(dir, { now = new Date(), log = () => {} } = {}) {
   const store = new Store(dir);
   const meta = store.readJson('meta');
   if (!meta) throw new Error(`No pull found in ${dir}/ — run \`lupa-check pull\` first.`);
 
-  const stores = store.readJson('stores', []);
-  const paymentTerms = store.readJson('paymentTerms', []);
+  const stores = store.readJson('stores', []) ?? [];
+  const paymentTerms = store.readJson('paymentTerms', []) ?? [];
+  const appointmentTypes = store.readJson('appointmentTypes', []) ?? [];
+  const referenceLists = store.readJson('referenceLists', []) ?? [];
+  const stockLocations = store.readJson('stockLocations', []) ?? [];
 
   const ctx = {
     meta,
     now,
     currency: meta.currency ?? 'GBP',
+    vatRates: meta.vatRates ?? [0, 5, 20],
     unavailable: new Set(Object.keys(meta.unavailable ?? {})),
+    counts: meta.counts ?? {},
+
     storeIds: new Set(stores.map((s) => s.id)),
     storeNames: new Map(stores.map((s) => [s.id, s.name ?? s.id])),
     paymentTermIds: new Set(paymentTerms.map((p) => p.id)),
-    employeeIds: new Set((store.readJson('employees', []) ?? []).map((e) => e.id)),
+    appointmentTypeIds: new Set(appointmentTypes.map((t) => t.id)),
+    referenceListIds: new Set(referenceLists.map((r) => r.id)),
+    stockLocationIds: new Set(stockLocations.map((l) => l.id)),
+    enums: store.readJson('enums', {}) ?? {},
+
     store,
+    _loaded: new Map(),
   };
 
-  // Collections are attached lazily-ish: only the ones a loaded module asks for are
-  // read into memory. With every module enabled this is the whole practice, which is
-  // fine for clients/pets/products and is why the financial modules stream instead.
-  for (const mod of MODULES) ctx[mod.key] = store.readAll(mod.key);
+  ctx.ix = buildIndexes(store, { log });
+
+  // Load a collection on demand; the engine releases it once its module has run.
+  ctx.load = (key) => {
+    if (!ctx._loaded.has(key)) ctx._loaded.set(key, store.readAll(key));
+    return ctx._loaded.get(key);
+  };
+  ctx.release = (key) => ctx._loaded.delete(key);
+
   return ctx;
 }
 
-export function runRules(ctx, { modules = MODULES } = {}) {
+export function runRules(ctx, { modules = MODULES, only } = {}) {
   const sections = [];
+  const wanted = only?.length ? modules.filter((m) => only.includes(m.key)) : modules;
 
-  for (const mod of modules) {
+  for (const mod of wanted) {
+    // A module with no collection of its own (cross-record) gets an empty rows array.
+    const rows = mod.collection === null ? [] : ctx.load(mod.collection ?? mod.key);
+    ctx.rows = rows;
+
     const findings = [];
     const skipped = [];
 
     for (const rule of mod.rules) {
-      if (rule.needs && ctx.unavailable.has(rule.needs)) {
-        skipped.push({ id: rule.id, title: rule.title, reason: `reference set "${rule.needs}" was not readable with this key` });
+      const missing = (rule.needs ? [rule.needs].flat() : []).find((n) => ctx.unavailable.has(n));
+      if (missing) {
+        skipped.push({ id: rule.id, title: rule.title, reason: `reference set "${missing}" was not readable with this key` });
         continue;
       }
-      let rows;
+      let hits;
       try {
-        rows = rule.run(ctx) ?? [];
+        hits = rule.run(ctx, rows) ?? [];
       } catch (err) {
         skipped.push({ id: rule.id, title: rule.title, reason: `rule threw: ${err.message}` });
         continue;
       }
-      if (!rows.length) continue;
+      if (!hits.length) continue;
 
-      const shown = rule.truncate ? rows.slice(0, rule.truncate) : rows;
+      const shown = rule.truncate ? hits.slice(0, rule.truncate) : hits;
       findings.push({
         id: rule.id,
         severity: rule.severity,
         title: rule.title,
         clientFacing: rule.clientFacing ?? rule.title,
         why: rule.why ?? null,
-        total: rows.length,
-        truncatedTo: rule.truncate && rows.length > rule.truncate ? rule.truncate : null,
+        internalOnly: Boolean(rule.internalOnly),
+        total: hits.length,
+        truncatedTo: rule.truncate && hits.length > rule.truncate ? rule.truncate : null,
         grouped: Boolean(rule.group),
+        linkType: rule.linkType ?? mod.linkType,
         rows: shown.map((r) => ({
-          id: r.record?.id ?? null,
+          id: r.record?.id ?? r.id ?? null,
           display: r.display,
           groupKey: r.groupKey ?? null,
           reason: r.reason ?? null,
+          link: r.link ?? null,
           fields: r.fields ?? {},
         })),
       });
     }
 
-    const counts = Object.fromEntries(SEVERITIES.map((s) => [s, findings.filter((f) => f.severity === s).reduce((t, f) => t + f.total, 0)]));
+    const counts = Object.fromEntries(
+      SEVERITIES.map((s) => [s, findings.filter((f) => f.severity === s).reduce((t, f) => t + f.total, 0)]),
+    );
+
+    let tally = [];
+    try {
+      tally = mod.tally(ctx, rows) ?? [];
+    } catch (err) {
+      skipped.push({ id: `${mod.key}.tally`, title: 'Tally', reason: `tally threw: ${err.message}` });
+    }
+
     sections.push({
       key: mod.key,
       label: mod.label,
       linkType: mod.linkType,
-      scanned: (ctx[mod.key] ?? []).length,
-      tally: mod.tally(ctx),
+      clientFacing: mod.clientFacing !== false,
+      scanned: mod.collection === null ? (ctx.counts[mod.scannedFrom] ?? 0) : rows.length,
+      ran: ctx.counts[mod.collection ?? mod.key] !== undefined || mod.collection === null,
+      tally,
       findings: findings.sort((a, b) => SEVERITIES.indexOf(a.severity) - SEVERITIES.indexOf(b.severity)),
       skipped,
       counts,
       flagged: counts.critical + counts.review + counts.info,
     });
+
+    if (mod.collection !== null) ctx.release(mod.collection ?? mod.key);
+    ctx.rows = undefined;
   }
 
   return sections;

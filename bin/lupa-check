@@ -6,6 +6,7 @@
 //   lupa-check pull    [--out DIR]     pull every record type to disk (resumable)
 //   lupa-check check   [--out DIR]     run the ruleset over a pull, write the report
 //   lupa-check run     [--out DIR]     pull then check
+//   lupa-check deliverables [--out DIR] client report, Dock copy, email draft, tickets
 //
 // Common flags:
 //   --env migrations|production        default: migrations
@@ -18,7 +19,7 @@
 // `pull` is the only subcommand that touches the network. If it cannot reach Lupa —
 // a sandbox with closed egress, say — run it somewhere that can and point `check` at
 // the same directory. See README, "When egress is closed".
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
@@ -28,6 +29,8 @@ import { pull, resolveContext } from '../src/pull.js';
 import { ENVIRONMENTS } from '../src/collections.js';
 import { buildContext, runRules } from '../src/rules/index.js';
 import { buildReport, writeReport } from '../src/report.js';
+import { writeClientReport } from '../src/client-report.js';
+import { writeDeliverables } from '../src/deliverables.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -52,6 +55,7 @@ function usage() {
   lupa-check pull    [--out DIR]     pull every record type to disk (resumable)
   lupa-check check   [--out DIR]     run the ruleset, write report.json + report.md
   lupa-check run     [--out DIR]     pull then check
+  lupa-check deliverables           client report, Dock copy, email, Linear export
 
   --env migrations|production   default: migrations
   --company <uuid>              only if the key sees several companies
@@ -98,6 +102,28 @@ function outDir(args) {
   return dir;
 }
 
+function printSummary(report) {
+  console.error('');
+  const w = Math.max(...report.summary.map((s) => s.category.length));
+  for (const s of report.summary) {
+    console.error(
+      `  ${s.category.padEnd(w)}  scanned ${String(s.scanned).padStart(7)}` +
+      `   critical ${String(s.critical).padStart(5)}` +
+      `   review ${String(s.review).padStart(5)}` +
+      `   info ${String(s.info).padStart(5)}` +
+      (s.skipped ? `   (${s.skipped} skipped)` : ''),
+    );
+  }
+  const totals = report.summary.reduce((t, s) => ({
+    critical: t.critical + s.critical, review: t.review + s.review, info: t.info + s.info, skipped: t.skipped + s.skipped,
+  }), { critical: 0, review: 0, info: 0, skipped: 0 });
+  console.error(`  ${''.padEnd(w)}  ${'-'.repeat(60)}`);
+  console.error(`  ${'TOTAL'.padEnd(w)}  ${' '.repeat(16)}   critical ${String(totals.critical).padStart(5)}   review ${String(totals.review).padStart(5)}   info ${String(totals.info).padStart(5)}${totals.skipped ? `   (${totals.skipped} skipped)` : ''}`);
+  if (Object.keys(report.unavailable ?? {}).length) {
+    console.error(`\n  Incomplete pull: ${Object.keys(report.unavailable).join(', ')} unreadable — dependent rules were SKIPPED, not passed.`);
+  }
+}
+
 const args = parseArgs(process.argv.slice(2));
 const command = args._[0];
 
@@ -139,15 +165,37 @@ try {
 
     case 'check': {
       const dir = outDir(args);
-      const ctx = buildContext(dir);
-      const sections = runRules(ctx);
+      const ctx = buildContext(dir, { log: args.verbose ? console.error : undefined });
+      const sections = runRules(ctx, { only: typeof args.only === 'string' ? args.only.split(',') : undefined });
       const report = buildReport(ctx, sections);
       const paths = writeReport(dir, report);
-      console.error('');
-      for (const s of report.summary) {
-        console.error(`  ${s.category.padEnd(18)} scanned ${String(s.scanned).padStart(7)}   critical ${String(s.critical).padStart(5)}   review ${String(s.review).padStart(5)}   info ${String(s.info).padStart(5)}${s.skipped ? `   (${s.skipped} skipped)` : ''}`);
-      }
+      printSummary(report);
       console.error(`\nWrote ${paths.md} and ${paths.json}`);
+      break;
+    }
+
+    case 'deliverables': {
+      const dir = outDir(args);
+      const reportPath = join(dir, 'report.json');
+      if (!existsSync(reportPath)) throw new Error(`No report.json in ${dir}/ — run \`lupa-check check\` first.`);
+      const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+
+      // Optional. Written by the skill after the deployment team has been through the
+      // findings: { "<ruleId>": { include: false, ticket: true, note: "..." } }.
+      const verdictPath = join(dir, 'verdicts.json');
+      const verdicts = existsSync(verdictPath) ? JSON.parse(readFileSync(verdictPath, 'utf8')) : undefined;
+      if (!verdicts) console.error('No verdicts.json — including every Critical and Review finding.');
+
+      const opts = {
+        verdicts,
+        contactName: typeof args.contact === 'string' ? args.contact : undefined,
+        senderName: typeof args.from === 'string' ? args.from : undefined,
+        team: typeof args.team === 'string' ? args.team : undefined,
+      };
+      const html = writeClientReport(dir, report, opts);
+      const rest = writeDeliverables(dir, report, opts);
+      console.error(`\nWrote:\n  ${html}\n  ${rest.dock}\n  ${rest.email}${rest.linear ? `\n  ${rest.linear}` : ''}`);
+      console.error('\nPrint report-client.html to PDF for the client-facing copy.');
       break;
     }
 
@@ -162,6 +210,7 @@ try {
       const ctx = buildContext(dir);
       const report = buildReport(ctx, runRules(ctx));
       const paths = writeReport(dir, report);
+      printSummary(report);
       console.error(`\nWrote ${paths.md} and ${paths.json}`);
       break;
     }
