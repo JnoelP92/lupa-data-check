@@ -7,7 +7,8 @@
     "node": ">=18"
   },
   "bin": {
-    "lupa-check": "./bin/lupa-check"
+    "lupa-check": "./bin/lupa-check",
+    "lupa-data-check": "./bin/lupa-check"
   },
   "scripts": {
     "test": "node --test",
@@ -15,5 +16,14 @@
     "sync:spec": "node scripts/sync-spec.js"
   },
   "license": "UNLICENSED",
-  "private": true
+  "private": true,
+  "files": [
+    "bin",
+    "src",
+    "scripts",
+    "skills",
+    "references",
+    "spec-fields.json",
+    "README.md"
+  ]
 }

@@ -36,6 +36,10 @@ Without it, every Critical and Review finding is included and no tickets are pro
 Nothing is ever sent or filed from here — the email is a draft and the Linear export is
 a file.
 
+The key is stored under its own keychain slot (`lupa-data-check`), not the one
+`api-upload-tool` uses. The two tools default to different environments, and a shared
+slot means one silently running with the other's key.
+
 ## When egress is closed
 
 Cowork runs code in a VM behind an egress proxy. Unless an admin has opened

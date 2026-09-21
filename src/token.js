@@ -11,7 +11,11 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-const SERVICE = 'lupa-api';
+// Deliberately NOT 'lupa-api', which api-upload-tool uses. The two tools default to
+// different environments — uploads to production, checks to migrations — so a shared
+// keychain slot means one tool silently picking up the other's key and either failing
+// with a 403 or, worse, succeeding against the wrong practice.
+const SERVICE = 'lupa-data-check';
 const ACCOUNT = 'current';
 
 export function resolveToken(root) {
