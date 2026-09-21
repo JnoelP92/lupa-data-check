@@ -13,6 +13,11 @@ while the review happens somewhere without it (a Cowork sandbox with closed egre
 
 - **Read-only, always.** There is no `put()` on the API client. Do not add one. Fixes go
   through the practice or through `api-upload-tool` as a separate reviewed change.
+- **Never add a rule without checking the field exists.** `npm run check:fields`
+  validates every field a rule reads against `spec-fields.json`. A rule reading a field
+  the API does not return matches nothing and is indistinguishable from a clean pass —
+  it is the one bug here that makes the output actively misleading. The check runs as
+  part of `npm test`; do not skip it.
 - **Referential rules are set membership, never a per-record GET.** `src/indexes.js`
   streams each collection once into identity sets. A `GET /v1/pet/{id}` per invoice line
   would be days of requests against a 100/min limit.
@@ -58,5 +63,7 @@ that file, not in the renderer.
 ## Checks
 
 ```bash
-npm test
+npm test                 # 44 tests, field check included
+npm run sync:spec        # refresh spec-fields.json when the API moves
+npm run check:fields
 ```

@@ -142,14 +142,19 @@ export default {
       linkType: 'appointment',
       truncate: 25,
       run: (ctx) => {
-        const charged = new Set();
+        const chargedInvoices = new Set();
         for (const i of ctx.store.read('invoices')) {
-          if (!isBlank(i.appointmentId) && Number(i.amountDue ?? 0) > 0) charged.add(i.appointmentId);
+          if (Number(i.amountDue ?? 0) > 0) chargedInvoices.add(i.id);
         }
         const out = [];
         for (const a of ctx.store.read('appointments')) {
-          if (lower(a.status) !== 'completed' || charged.has(a.id)) continue;
-          out.push({ record: a, display: a.title ?? a.visitTypeName ?? '(untitled)', fields: { start: a.start, pet: ctx.ix.petName.get(a.petId) ?? a.petId } });
+          if (lower(a.status) !== 'completed') continue;
+          const invoiceId = a.storeInvoiceId;
+          if (invoiceId && chargedInvoices.has(invoiceId)) continue;
+          out.push({
+            record: a, display: a.title ?? a.visitTypeName ?? '(untitled)',
+            fields: { start: a.start, pet: ctx.ix.petName.get(a.petId) ?? a.petId, invoiced: invoiceId ? 'zero-value invoice' : 'no invoice' },
+          });
         }
         return out;
       },

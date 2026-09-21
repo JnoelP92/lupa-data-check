@@ -69,7 +69,7 @@ function findingHtml(finding, sectionLinkType) {
   const keys = [...new Set(finding.rows.flatMap((r) => Object.keys(r.fields)))];
   const head = ['', ...keys, 'Open in Lupa'];
   const body = finding.rows.map((r) => {
-    const l = link(finding.linkType ?? sectionLinkType, { id: r.id, ...r.fields });
+    const l = r.link ?? link(finding.linkType ?? sectionLinkType, { id: r.id, ...r.fields });
     const open = l?.url
       ? `<a href="${esc(l.url)}">Open &#8599;</a>${l.search ? ` <span class="count">search “${esc(l.search)}”</span>` : ''}`
       : '—';

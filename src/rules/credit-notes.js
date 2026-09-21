@@ -6,7 +6,8 @@
 import { isBlank, lower, breakdown, money, parseMoneyString } from '../util.js';
 
 const amountOf = (c) => parseMoneyString(c.amount) ?? 0;
-const label = (c) => c.creditNoteNumber ?? c.id?.slice(0, 8) ?? '(credit note)';
+// No human-readable number on this resource, so a short id is the best handle there is.
+const label = (c) => (c.id ? `CN ${c.id.slice(0, 8)}` : '(credit note)');
 
 export default {
   key: 'creditNotes',
@@ -32,6 +33,17 @@ export default {
       title: 'Credit note for zero or less',
       run: (ctx, rows) => rows.filter((c) => amountOf(c) <= 0).map((c) => ({
         record: c, display: label(c), fields: { client: c.clientId, amount: c.amount, reason: c.reason },
+      })),
+    },
+    {
+      id: 'creditNotes.reason.migration', severity: 'review',
+      title: 'Credit issued with reason "unknown due to migration"',
+      clientFacing: 'Credit on the account with no recorded reason.',
+      why: 'The previous system did not say why the credit existed. Worth confirming these are real before go-live, because they reduce what the client owes.',
+      truncate: 25,
+      run: (ctx, rows) => rows.filter((c) => lower(c.reason) === 'unknown_due_to_migration').map((c) => ({
+        record: c, display: label(c),
+        fields: { client: c.clientId, amount: money(amountOf(c), ctx.currency), status: c.status },
       })),
     },
     {

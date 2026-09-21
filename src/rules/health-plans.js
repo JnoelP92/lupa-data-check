@@ -52,13 +52,12 @@ export default {
       run: (ctx, rows) => rows.flatMap((p) => (p.allowances ?? [])
         .filter((a) => ITEM_ALLOWANCES.has(lower(a.type)))
         .filter((a) => {
-          const id = a.itemId ?? a.productId ?? a.serviceId;
-          if (isBlank(id)) return true;
-          return !ctx.ix.productIds.has(id) && !ctx.ix.serviceIds.has(id);
+          if (isBlank(a.item)) return true;
+          return !ctx.ix.productIds.has(a.item) && !ctx.ix.serviceIds.has(a.item);
         })
         .map((a) => ({
           record: p, display: p.name,
-          fields: { allowance: a.name ?? a.type, danglingItemId: a.itemId ?? a.productId ?? a.serviceId ?? '(none)' },
+          fields: { allowance: a.name ?? a.type, danglingItem: a.item ?? '(none)' },
         }))),
     },
     {
@@ -71,8 +70,8 @@ export default {
         ].map((v) => lower(typeof v === 'string' ? v : v?.value ?? v?.name)));
         if (!valid.size) return [];
         return rows.flatMap((p) => (p.allowances ?? [])
-          .filter((a) => CATEGORY_ALLOWANCES.has(lower(a.type)) && !isBlank(a.itemId) && !valid.has(lower(a.itemId)))
-          .map((a) => ({ record: p, display: p.name, fields: { allowance: a.name ?? a.type, category: a.itemId } })));
+          .filter((a) => CATEGORY_ALLOWANCES.has(lower(a.type)) && !isBlank(a.item) && !valid.has(lower(a.item)))
+          .map((a) => ({ record: p, display: p.name, fields: { allowance: a.name ?? a.type, category: a.item } })));
       },
     },
     {

@@ -120,8 +120,18 @@ not something to paper over in the moment.
   persists in the session transcript on disk; replacing it in Lupa invalidates every
   copy at once.
 
-## What the ruleset covers today
+## Reading a tally before trusting a rule
 
-`references/ruleset-v1.md` is the source of truth and records which categories are
-implemented. Clients is complete. The rest are specified but not yet coded — say so
-plainly rather than implying a clean pass on a category that never ran.
+Field names are validated against the API spec, but enum *values* are not — the spec
+declares none for appointment status or dispense tracking mode. Each category's tally
+includes a breakdown of those fields. If a breakdown does not contain a value a rule
+keys on (no `completed` under appointment status, say), the rules keyed on it found
+nothing because the vocabulary differs, not because the data is clean. Say so rather
+than reporting a pass.
+
+## What the ruleset covers
+
+All 20 modules, 230 rules — `references/ruleset-v1.md` is the source of truth, and it
+names every place the API differs from the original spec document and what changed as a
+result. Several rules the document asked for do not exist because the fields do not.
+When someone asks why a check they expected is missing, that file has the answer.

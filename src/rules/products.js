@@ -14,7 +14,11 @@ const DOSE_UNITS = new Set(['tablet', 'tab', 'capsule', 'cap', 'ml', 'millilitre
 const CONTAINER_UNITS = new Set(['bottle', 'box', 'pack', 'packet', 'tub', 'bag', 'carton', 'tube', 'jar']);
 const SERVICE_WORDS = /\b(consult|consultation|exam|examination|surgery|procedure|appointment|check[- ]?up|fee|admission|anaesthe|operation|scan|x[- ]?ray)\b/i;
 
+// The API reports `margin` directly. Prefer it: it is what the UI shows, and
+// recomputing it here would silently diverge if Lupa changes the definition. Fall back
+// to markup on cost only when the field is absent.
 const markup = (p) => {
+  if (!isBlank(p.margin)) return Number(p.margin);
   const cost = Number(p.procurementCost ?? 0), price = Number(p.price ?? 0);
   return cost > 0 ? ((price - cost) / cost) * 100 : null;
 };

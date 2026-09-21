@@ -52,8 +52,7 @@ const pet = (id, over = {}) => ({
   id, name: `Pet${id}`, species: 'Dog', breed: 'Labrador', sex: 'male',
   dob: '2019-06-01', deceased: false, deceasedDate: null, neutered: false, neuteredDate: null,
   microchipped: true, microchip: `9001234567890${id.slice(-2)}`, isArchived: false,
-  clientsPets: [{ clientId: 'c0001', isArchived: false }], weights: [{ kg: 22 }],
-  insuranceStatus: 'none', ...over,
+  clientsPets: [{ clientId: 'c0001', isArchived: false }], weights: [{ kg: 22 }], ...over,
 });
 
 export const PETS = [
@@ -79,7 +78,7 @@ export const PETS = [
 ];
 
 export const EMPLOYEES = [
-  { id: 'e01', firstName: 'Ada', lastName: 'Vet', email: 'ada@clinic.test', role: 'vet', rcvsRegistrationNumber: 'RCVS1', status: 'active', stores: [{ id: STORE_A, showInCalendar: true }], visitTypes: [VISIT_TYPE] },
+  { id: 'e01', firstName: 'Ada', lastName: 'Vet', email: 'ada@clinic.test', role: 'vet', rcvsRegistrationNumber: 'RCVS1', status: 'active', stores: [{ id: STORE_A, showInCalendar: true, isOnlineBookingPoc: true }], visitTypes: [VISIT_TYPE] },
   { id: 'e02', firstName: 'Bo', lastName: 'Nurse', email: null, role: 'nurse', status: 'active', stores: [{ id: STORE_A, showInCalendar: true }], visitTypes: [VISIT_TYPE] },
   { id: 'e03', firstName: 'Cy', lastName: 'Vet', email: 'cy@clinic.test', role: 'vet', rcvsRegistrationNumber: null, status: 'active', stores: [{ id: STORE_A, showInCalendar: true }], visitTypes: [VISIT_TYPE] },
   { id: 'e04', firstName: 'Di', lastName: 'Admin', email: 'di@clinic.test', role: 'admin', status: 'active', stores: [], visitTypes: [VISIT_TYPE] },
@@ -94,12 +93,12 @@ const appt = (id, over = {}) => {
     id, title: `Consult ${id}`, petId: 'p01', clientId: 'c0001', storeId: STORE_A,
     start: `2026-08-${day}T09:00:00Z`, end: `2026-08-${day}T09:30:00Z`, status: 'completed',
     visitTypeId: VISIT_TYPE, visitTypeName: 'Consult', visitTypeCategory: 'consult',
-    employees: [{ id: 'e01', isMainEmployee: true }], checkedInAt: null, ...over,
+    employees: [{ id: 'e01', isMainEmployee: true }], checkedInAt: null, storeInvoiceId: null, ...over,
   };
 };
 
 export const APPOINTMENTS = [
-  appt('ap01'),
+  appt('ap01', { storeInvoiceId: 'in28' }),
   appt('ap02', { start: '2026-08-02T10:00:00Z', end: '2026-08-02T09:00:00Z' }),
   appt('ap03', { start: '2026-08-03T09:00:00Z', end: '2026-08-03T09:00:00Z' }),
   appt('ap04', { start: '2026-08-04T08:00:00Z', end: '2026-08-04T20:00:00Z' }),
@@ -123,7 +122,7 @@ export const APPOINTMENTS = [
 
 const product = (id, over = {}) => ({
   id, name: `Product ${id}`, itemCode: `IC-${id}`, barcode: `BC-${id}`, category: 'nutrition',
-  price: 2000, procurementCost: 1000, vatPercentage: 20, isSellable: true, isArchived: false,
+  price: 2000, procurementCost: 1000, margin: 100, vatPercentage: 20, isSellable: true, isArchived: false,
   isStockControlEnabled: true, requiresPrescription: false, hasSubunit: false,
   subunit: null, subunitMultiplier: null, sellableUnits: 'only_unit_sellable',
   unit: 'bag', measureUnit: 'bag', dispensingFee: 0, storeId: STORE_A,
@@ -134,12 +133,12 @@ const product = (id, over = {}) => ({
 
 export const PRODUCTS = [
   product('pr01'),
-  product('pr02', { price: 500, procurementCost: 1000 }),
-  product('pr03', { price: 1000, procurementCost: 1000 }),
+  product('pr02', { price: 500, procurementCost: 1000, margin: -50 }),
+  product('pr03', { price: 1000, procurementCost: 1000, margin: 0 }),
   product('pr04', { price: 0 }),
   product('pr05', { price: -100 }),
-  product('pr06', { procurementCost: 0 }),
-  product('pr07', { price: 100000, procurementCost: 1000 }),
+  product('pr06', { procurementCost: 0, margin: null }),
+  product('pr07', { price: 100000, procurementCost: 1000, margin: 9900 }),
   product('pr08', { vatPercentage: 17.5 }),
   product('pr09', { name: 'Consultation Fee' }),
   product('pr10', { unit: null }),
@@ -169,27 +168,23 @@ export const PRODUCTS = [
 ];
 
 const service = (id, over = {}) => ({
-  id, name: `Service ${id}`, internalName: null, category: 'consult',
-  price: 4000, procurementCost: 1000, vatPercentage: 20,
-  isSellable: true, isArchived: false, isVatExemptEligible: false, isExternal: false,
-  storeId: STORE_A, referenceListId: REF_LIST, ...over,
+  id, name: `Service ${id}`, category: 'consult', price: 4000, margin: 300,
+  storeId: STORE_A, referenceListId: REF_LIST, externalReference: null, ...over,
 });
 
 export const SERVICES = [
   service('sv01'),
   service('sv02', { price: -100 }),
   service('sv03', { price: 0 }),
-  service('sv04', { price: 500, procurementCost: 1000 }),
-  service('sv05', { price: 100000, procurementCost: 1000 }),
-  service('sv06', { vatPercentage: 17.5 }),
-  service('sv07', { category: 'other' }),
-  service('sv08', { category: 'other', name: 'Consult follow up' }),
-  service('sv09', { name: 'Wormer tablet' }),
-  service('sv10', { storeId: GHOST_STORE }),
-  service('sv11', { referenceListId: 'ghost-list' }),
-  service('sv12', { name: 'Dup Service' }),
-  service('sv13', { name: 'dup service' }),
-  service('sv14', { isSellable: true, isArchived: true }),
+  service('sv04', { margin: -20 }),
+  service('sv05', { margin: 900 }),
+  service('sv06', { category: 'other' }),
+  service('sv07', { category: 'other', name: 'Consult follow up' }),
+  service('sv08', { name: 'Wormer tablet' }),
+  service('sv09', { storeId: GHOST_STORE }),
+  service('sv10', { referenceListId: 'ghost-list' }),
+  service('sv11', { name: 'Dup Service' }),
+  service('sv12', { name: 'dup service' }),
 ];
 
 export const BUNDLES = [
@@ -204,15 +199,15 @@ export const BUNDLES = [
 ];
 
 export const HEALTH_PLANS = [
-  { id: 'hp01', name: 'Wellness', status: 'active', price: 2000, billingPeriod: 'monthly', targetSubscriberType: 'pet', allowances: [{ id: 'al1', name: 'Vacc', type: 'individual_service', itemId: 'sv01', status: 'active', appliesTo: 'pet', config: { limit: 1 } }] },
+  { id: 'hp01', name: 'Wellness', status: 'active', price: 2000, billingPeriod: 'monthly', targetSubscriberType: 'pet', allowances: [{ id: 'al1', name: 'Vacc', type: 'individual_service', item: 'sv01', status: 'active', appliesTo: 'pet', config: { limit: 1 } }] },
   { id: 'hp02', name: 'Free Plan', status: 'active', price: 0, billingPeriod: 'monthly', targetSubscriberType: 'pet', allowances: [] },
-  { id: 'hp03', name: 'Wellness', status: 'active', price: 3000, billingPeriod: 'annually', targetSubscriberType: 'client', allowances: [{ id: 'al2', name: 'Ghost', type: 'individual_product', itemId: 'ghost-product', status: 'active', appliesTo: 'pet', config: { limit: 2 } }] },
-  { id: 'hp04', name: 'Unbounded', status: 'active', price: 1000, billingPeriod: 'monthly', targetSubscriberType: 'pet', allowances: [{ id: 'al3', name: 'No limit', type: 'product_category', itemId: 'nutrition', status: 'active', appliesTo: 'pet', config: {} }, { id: 'al4', name: 'No appliesTo', type: 'product_category', itemId: 'nutrition', status: 'active', appliesTo: null, config: { limit: 1 } }] },
+  { id: 'hp03', name: 'Wellness', status: 'active', price: 3000, billingPeriod: 'annually', targetSubscriberType: 'client', allowances: [{ id: 'al2', name: 'Ghost', type: 'individual_product', item: 'ghost-product', status: 'active', appliesTo: 'pet', config: { limit: 2 } }] },
+  { id: 'hp04', name: 'Unbounded', status: 'active', price: 1000, billingPeriod: 'monthly', targetSubscriberType: 'pet', allowances: [{ id: 'al3', name: 'No limit', type: 'product_category', item: 'nutrition', status: 'active', appliesTo: 'pet', config: {} }, { id: 'al4', name: 'No appliesTo', type: 'product_category', item: 'nutrition', status: 'active', appliesTo: null, config: { limit: 1 } }] },
 ];
 
 const sub = (id, over = {}) => ({
   id, healthPlanId: 'hp01', subscriberType: 'pet', subscriberId: 'p01', status: 'active',
-  startedOn: '2026-01-01', endedOn: null, paymentEnabled: true, paymentDay: 1,
+  startedOn: '2026-01-01', endedOn: null, paymentDay: 1,
   createdAt: '2026-01-01T00:00:00Z', usages: [], cancellationReason: null, ...over,
 });
 
@@ -228,7 +223,6 @@ export const SUBSCRIPTIONS = [
   sub('sb09', { subscriberType: 'client', subscriberId: 'c0019' }),
   sub('sb10', { subscriberId: 'p05' }),
   sub('sb11', { subscriberId: 'p05' }),
-  sub('sb12', { subscriberId: 'p10', paymentEnabled: false }),
   sub('sb13', { subscriberId: 'p11', paymentDay: null }),
 ];
 
@@ -316,7 +310,7 @@ const invoice = (id, over = {}) => ({
   id, invoiceNumber: `INV-${id}`, clientId: 'c0001', petId: 'p01', storeId: STORE_A,
   status: 'completed', paymentStatus: 'unpaid', amountDue: 2000, amountPaid: 0,
   activeFrom: '2026-06-01T10:00:00Z', discountAmount: 0, discountType: '£',
-  createdByEmployeeId: 'e01', appointmentId: null,
+  createdByEmployeeId: 'e01',
   billingProducts: [pLine('l1')], billingServices: [], billingBundles: [], ...over,
 });
 
@@ -357,7 +351,7 @@ export const INVOICES = [
     billingBundles: [{ id: 'bb2', storeBundleId: 'bn01', parentBillingBundleId: 'ghost-instance' }],
     billingProducts: [pLine('l1', { price: 2000, billingBundleId: 'bb2' })],
   }),
-  invoice('in28', { clientId: 'c0001', appointmentId: 'ap01', amountDue: 2000 }),
+  invoice('in28', { clientId: 'c0001', amountDue: 2000 }),
 ];
 
 const payment = (id, over = {}) => ({
@@ -385,7 +379,8 @@ export const CREDIT_NOTES = [
   { id: 'cn05', clientId: 'ghost-client', status: 'issued', amount: '5.00', isRefundable: true, reason: 'error', issuedAt: '2026-06-02T10:00:00Z', items: [{ billingProductId: 'l1' }] },
   { id: 'cn06', clientId: 'c0001', storeInvoiceId: 'ghost-invoice', status: 'issued', amount: '5.00', isRefundable: true, reason: 'error', issuedAt: '2026-06-02T10:00:00Z', items: [{ billingProductId: 'l1' }] },
   { id: 'cn07', clientId: 'c0001', petId: 'ghost-pet', status: 'issued', amount: '5.00', isRefundable: true, reason: 'error', issuedAt: '2026-06-02T10:00:00Z', items: [{ billingProductId: 'l1' }] },
-  { id: 'cn08', clientId: 'c0001', storeInvoiceId: 'in01', status: 'issued', amount: '5.00', isRefundable: true, reason: 'error', issuedAt: '2026-06-02T10:00:00Z', items: [{ billingProductId: 'ghost-line' }] },
+  { id: 'cn08', clientId: 'c0001', storeInvoiceId: 'in01', status: 'issued', amount: '5.00', isRefundable: true, reason: 'SOLD_IN_ERROR', issuedAt: '2026-06-02T10:00:00Z', items: [{ billingProductId: 'ghost-line' }] },
+  { id: 'cn09', clientId: 'c0001', status: 'issued', amount: '25.00', isRefundable: false, reason: 'UNKNOWN_DUE_TO_MIGRATION', issuedAt: '2026-06-02T10:00:00Z', items: [{ billingProductId: 'l1' }] },
 ];
 
 export const REFUNDS = [
@@ -400,11 +395,22 @@ export const REFUNDS = [
 ];
 
 export const ESTIMATES = [
-  { ...invoice('es01', { clientId: 'c0001', petId: 'p01', status: 'estimate', activeFrom: '2026-06-01T10:00:00Z' }) },
-  { ...invoice('es02', { clientId: 'c0005', petId: 'p05', status: 'estimate', amountDue: 9999, activeFrom: '2026-01-01T10:00:00Z', billingProducts: [pLine('l1', { price: 2000 })] }) },
-  { ...invoice('es03', { clientId: 'ghost-client', status: 'estimate' }) },
-  { ...invoice('es04', { petId: 'ghost-pet', status: 'estimate' }) },
-  { ...invoice('es05', { storeId: GHOST_STORE, status: 'estimate' }) },
+  { ...invoice('es01', { clientId: 'c0001', petId: 'p01', activeFrom: '2026-06-01T10:00:00Z' }) },
+  { ...invoice('es02', { clientId: 'c0005', petId: 'p05', amountDue: 9999, activeFrom: '2026-01-01T10:00:00Z', billingProducts: [pLine('l1', { price: 2000 })] }) },
+  { ...invoice('es03', { clientId: 'ghost-client' }) },
+  { ...invoice('es04', { petId: 'ghost-pet' }) },
+  { ...invoice('es05', { storeId: GHOST_STORE }) },
+];
+
+export const INSURANCE_POLICIES = [
+  { id: 'ip01', petId: 'p01', policyNumber: 'POL-1', insurerId: 'ins-1', insurerName: 'Petplan', policyHolderName: 'Test Client1', isArchived: false },
+  { id: 'ip02', petId: 'ghost-pet', policyNumber: 'POL-2', insurerId: 'ins-1', insurerName: 'Petplan', policyHolderName: 'Test Client1', isArchived: false },
+  { id: 'ip03', petId: 'p03', policyNumber: null, insurerId: 'ins-1', insurerName: 'Petplan', policyHolderName: 'Test Client1', isArchived: false },
+  { id: 'ip04', petId: 'p04', policyNumber: 'POL-4', insurerId: 'ins-1', insurerName: 'Petplan', policyHolderName: null, isArchived: false },
+  { id: 'ip05', petId: 'p05', policyNumber: 'DUP-POL', insurerId: 'ins-1', insurerName: 'Petplan', policyHolderName: 'Test Client1', isArchived: false },
+  { id: 'ip06', petId: 'p06', policyNumber: 'DUP-POL', insurerId: 'ins-2', insurerName: 'Agria', policyHolderName: 'Test Client1', isArchived: false },
+  { id: 'ip07', petId: 'p08', policyNumber: 'POL-7', insurerId: 'ins-1', insurerName: 'Petplan', policyHolderName: 'Test Client1', isArchived: false },
+  { id: 'ip08', petId: 'p01', policyNumber: 'POL-8', insurerId: 'ins-1', insurerName: 'Petplan', policyHolderName: 'Test Client1', isArchived: true },
 ];
 
 const jsonl = (rows) => rows.map((r) => JSON.stringify(r)).join('\n') + '\n';
@@ -420,7 +426,7 @@ export function makePull({ overrides = {}, unavailable = {}, now = '2026-09-20' 
     medicalRecords: MEDICAL_RECORDS, clinicalNotes: CLINICAL_NOTES,
     prescriptions: PRESCRIPTIONS, invoices: INVOICES, payments: PAYMENTS,
     creditNotes: CREDIT_NOTES, refunds: REFUNDS, estimates: ESTIMATES,
-    employees: EMPLOYEES,
+    employees: EMPLOYEES, insurancePolicies: INSURANCE_POLICIES,
     ...overrides,
   };
 

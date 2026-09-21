@@ -35,6 +35,7 @@ import creditNotes from './credit-notes.js';
 import refunds from './refunds.js';
 import estimates from './estimates.js';
 import employees from './employees.js';
+import insurancePolicies from './insurance-policies.js';
 import crossRecord from './cross-record.js';
 
 // Ordered by severity impact, not alphabetically: financials and pets first, reminders
@@ -44,7 +45,7 @@ export const MODULES = [
   clients, pets, appointments,
   products, services, bundles,
   healthPlans, subscriptions,
-  prescriptions, medicalRecords,
+  prescriptions, medicalRecords, insurancePolicies,
   employees, reminders, clinicalNotes,
   crossRecord,
 ];
@@ -138,7 +139,9 @@ export function runRules(ctx, { modules = MODULES, only } = {}) {
           display: r.display,
           groupKey: r.groupKey ?? null,
           reason: r.reason ?? null,
-          link: r.link ?? null,
+          // Some records have no URL of their own and must borrow one — a clinical note
+          // links to the pet it is filed against. `linkFor` on the module resolves that.
+          link: r.link ?? (mod.linkFor && r.record ? mod.linkFor(ctx, r.record) : null),
           fields: r.fields ?? {},
         })),
       });

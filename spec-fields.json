@@ -1,0 +1,913 @@
+{
+  "fetchedAt": "2026-09-21",
+  "title": "Lupa Veterinary Practice Management API",
+  "version": "1.0.0",
+  "resources": {
+    "clients": {
+      "path": "/v1/clients",
+      "fields": [
+        "address",
+        "balance",
+        "billingAddress",
+        "billingHold",
+        "companyId",
+        "contacts",
+        "createdAt",
+        "dob",
+        "email",
+        "firstName",
+        "fullName",
+        "gdprOptIn",
+        "id",
+        "isArchived",
+        "lastName",
+        "notes",
+        "numericId",
+        "paymentTerms",
+        "paymentTermsId",
+        "pets",
+        "phone",
+        "platformCommsOptIn",
+        "primaryStoreId",
+        "referralSource",
+        "title",
+        "updatedAt"
+      ],
+      "nested": {
+        "contacts": [
+          "email",
+          "firstName",
+          "id",
+          "lastName",
+          "phone",
+          "relationshipType",
+          "title"
+        ],
+        "pets": [
+          "id"
+        ]
+      },
+      "enums": {}
+    },
+    "pets": {
+      "path": "/v1/pets",
+      "fields": [
+        "breed",
+        "clientsPets",
+        "colour",
+        "createdAt",
+        "deceased",
+        "deceasedDate",
+        "dob",
+        "id",
+        "microchip",
+        "microchipLocation",
+        "microchipped",
+        "name",
+        "neutered",
+        "neuteredDate",
+        "sex",
+        "species",
+        "updatedAt",
+        "weights"
+      ],
+      "nested": {
+        "clientsPets": [
+          "clientId",
+          "isArchived",
+          "petNotes",
+          "petNumericId",
+          "registeredAt"
+        ]
+      },
+      "enums": {}
+    },
+    "appointments": {
+      "path": "/v1/appointments",
+      "fields": [
+        "billingContextId",
+        "bookingNotes",
+        "checkedInAt",
+        "clientId",
+        "clientNotes",
+        "companyId",
+        "createdAt",
+        "createdFrom",
+        "employees",
+        "end",
+        "id",
+        "location",
+        "notes",
+        "petId",
+        "roomId",
+        "start",
+        "status",
+        "storeId",
+        "storeInvoiceId",
+        "title",
+        "updatedAt",
+        "visitTypeCategory",
+        "visitTypeId",
+        "visitTypeName"
+      ],
+      "nested": {
+        "employees": [
+          "id",
+          "isMainEmployee"
+        ]
+      },
+      "enums": {
+        "createdFrom": [
+          "app",
+          "plugin",
+          "work",
+          "migration",
+          "external_api"
+        ],
+        "visitTypeCategory": [
+          "admin",
+          "consult",
+          "daycare",
+          "dental",
+          "diagnostics",
+          "euthanasia",
+          "grooming",
+          "group_training",
+          "group_walking",
+          "health",
+          "hospital",
+          "in_home",
+          "individual_training",
+          "individual_walking",
+          "nurse",
+          "other",
+          "overnight",
+          "surgical",
+          "vaccination",
+          "fee"
+        ]
+      }
+    },
+    "products": {
+      "path": "/v1/products",
+      "fields": [
+        "barcode",
+        "bundleIds",
+        "category",
+        "companyId",
+        "createdAt",
+        "description",
+        "dispensingFee",
+        "hasSubunit",
+        "id",
+        "isArchived",
+        "isSellable",
+        "isStockControlEnabled",
+        "itemCode",
+        "margin",
+        "measureUnit",
+        "minimumStockLevel",
+        "name",
+        "optimalStockLevel",
+        "price",
+        "procurementCost",
+        "productsStocks",
+        "qrCodeLink",
+        "quantity",
+        "referenceListId",
+        "requiresPrescription",
+        "sellableUnits",
+        "storeId",
+        "subunit",
+        "subunitMultiplier",
+        "supplierProductId",
+        "unit",
+        "updatedAt",
+        "vatPercentage"
+      ],
+      "nested": {
+        "productsStocks": [
+          "batch",
+          "batchId",
+          "createdAt",
+          "id",
+          "isArchived",
+          "quantity",
+          "stockLocation",
+          "stockLocationId",
+          "updatedAt"
+        ]
+      },
+      "enums": {
+        "category": [
+          "anti_parasitic",
+          "consumables",
+          "general_medication",
+          "grooming_care",
+          "injectables",
+          "nutrition",
+          "other",
+          "pet_accessories",
+          "vaccination"
+        ],
+        "sellableUnits": [
+          "both_units_sellable",
+          "only_unit_sellable",
+          "only_subunit_sellable"
+        ]
+      }
+    },
+    "services": {
+      "path": "/v1/services",
+      "fields": [
+        "category",
+        "companyId",
+        "createdAt",
+        "externalReference",
+        "id",
+        "margin",
+        "name",
+        "price",
+        "referenceListId",
+        "storeId",
+        "updatedAt"
+      ],
+      "nested": {},
+      "enums": {
+        "category": [
+          "admin",
+          "consult",
+          "daycare",
+          "dental",
+          "diagnostics",
+          "euthanasia",
+          "grooming",
+          "group_training",
+          "group_walking",
+          "health",
+          "hospital",
+          "in_home",
+          "individual_training",
+          "individual_walking",
+          "nurse",
+          "other",
+          "overnight",
+          "surgical",
+          "vaccination",
+          "fee"
+        ]
+      }
+    },
+    "bundles": {
+      "path": "/v1/bundles",
+      "fields": [
+        "childBundleIds",
+        "companyId",
+        "createdAt",
+        "id",
+        "name",
+        "parentBundleIds",
+        "price",
+        "storeId",
+        "updatedAt"
+      ],
+      "nested": {},
+      "enums": {}
+    },
+    "healthPlans": {
+      "path": "/v1/health-plans",
+      "fields": [
+        "allowances",
+        "analysisCode",
+        "billingPeriod",
+        "companyId",
+        "createdAt",
+        "id",
+        "name",
+        "price",
+        "status",
+        "storeId",
+        "targetSubscriberType",
+        "updatedAt"
+      ],
+      "nested": {
+        "allowances": [
+          "appliesTo",
+          "config",
+          "id",
+          "item",
+          "name",
+          "status",
+          "type"
+        ]
+      },
+      "enums": {
+        "targetSubscriberType": [
+          "client",
+          "pet"
+        ],
+        "status": [
+          "active",
+          "cancelled"
+        ],
+        "billingPeriod": [
+          "annually",
+          "monthly"
+        ]
+      }
+    },
+    "healthPlanSubscriptions": {
+      "path": "/v1/health-plans/subscriptions",
+      "fields": [
+        "cancellationReason",
+        "companyId",
+        "createdAt",
+        "endedOn",
+        "healthPlanId",
+        "id",
+        "paymentDay",
+        "startedOn",
+        "status",
+        "storeId",
+        "subscriberId",
+        "subscriberType",
+        "updatedAt",
+        "usages"
+      ],
+      "nested": {
+        "usages": [
+          "billingProductId",
+          "billingServiceId",
+          "id",
+          "quantity",
+          "usageDate"
+        ]
+      },
+      "enums": {
+        "status": [
+          "pending_payment",
+          "pending_payment_method_token",
+          "active",
+          "paused",
+          "cancelled"
+        ],
+        "subscriberType": [
+          "client",
+          "pet"
+        ]
+      }
+    },
+    "reminders": {
+      "path": "/v1/reminders",
+      "fields": [
+        "companyId",
+        "createdAt",
+        "enableAutoRepeat",
+        "id",
+        "interval",
+        "name",
+        "petScheduleType",
+        "remindDaysAfter",
+        "remindDaysBefore",
+        "remindIfMissed",
+        "reminderMediums",
+        "status",
+        "updatedAt"
+      ],
+      "nested": {},
+      "enums": {
+        "petScheduleType": [
+          "VACCINATION",
+          "ANTI_PARASITIC",
+          "OTHER_PREVENTIVE",
+          "PRESCRIPTION_REFILL",
+          "BOOK_APPOINTMENT",
+          "CUSTOM"
+        ],
+        "status": [
+          "draft",
+          "active",
+          "archived"
+        ]
+      }
+    },
+    "medicalRecords": {
+      "path": "/v1/medical-records",
+      "fields": [
+        "appointmentId",
+        "category",
+        "createdAt",
+        "date",
+        "description",
+        "endDate",
+        "id",
+        "nextDueDate",
+        "petId",
+        "title",
+        "type",
+        "updatedAt"
+      ],
+      "nested": {},
+      "enums": {
+        "type": [
+          "diagnosis",
+          "preventive"
+        ],
+        "category": [
+          "allergy",
+          "illness",
+          "infection",
+          "injury",
+          "anti_parasitic",
+          "vaccination",
+          "other"
+        ]
+      }
+    },
+    "clinicalNotes": {
+      "path": "/v1/clinical-notes",
+      "fields": [
+        "content",
+        "contentType",
+        "createdAt",
+        "employeeId",
+        "entityId",
+        "entityType",
+        "id",
+        "isArchived",
+        "updatedAt"
+      ],
+      "nested": {},
+      "enums": {
+        "entityType": [
+          "ADMISSION",
+          "ADMISSION_ACTION",
+          "APPOINTMENT",
+          "APPOINTMENT_REMINDER",
+          "BILLING_PRODUCT",
+          "BILLING_SERVICE",
+          "BILLING_CONTEXT",
+          "BUNDLE",
+          "CLIENT",
+          "INVENTORY_SESSION",
+          "INVOICE",
+          "PET",
+          "PET_OBSERVATION",
+          "VISIT_TYPE"
+        ],
+        "contentType": [
+          "CLINICAL",
+          "DIAGNOSIS",
+          "FINANCIAL",
+          "INTERNAL"
+        ]
+      }
+    },
+    "prescriptions": {
+      "path": "/v1/prescriptions",
+      "fields": [
+        "appointmentId",
+        "clientId",
+        "createdAt",
+        "dispenseTrackingMode",
+        "employeeId",
+        "endDate",
+        "expiryDate",
+        "id",
+        "isPrescribedOnly",
+        "petId",
+        "prescriptionDispenses",
+        "productName",
+        "quantity",
+        "refillLimit",
+        "sourceProductId",
+        "startDate",
+        "status",
+        "unit",
+        "updatedAt"
+      ],
+      "nested": {
+        "prescriptionDispenses": [
+          "authorisedAt",
+          "createdAt",
+          "handedToClientAt",
+          "id",
+          "isCancelled"
+        ]
+      },
+      "enums": {
+        "status": [
+          "pending",
+          "completed",
+          "cancelled",
+          "archived"
+        ]
+      }
+    },
+    "invoices": {
+      "path": "/v1/financials/invoices",
+      "fields": [
+        "activeFrom",
+        "amountDue",
+        "amountPaid",
+        "appointmentEmployeeIds",
+        "billingBundles",
+        "billingProducts",
+        "billingServices",
+        "clientEmail",
+        "clientFirstName",
+        "clientId",
+        "clientLastName",
+        "companyId",
+        "createdAt",
+        "createdByEmployeeId",
+        "departmentId",
+        "discountAmount",
+        "discountType",
+        "dueOn",
+        "id",
+        "invoiceNumber",
+        "paymentStatus",
+        "petId",
+        "status",
+        "storeId",
+        "tags",
+        "updatedAt",
+        "updatedByEmployeeId"
+      ],
+      "nested": {
+        "billingProducts": [
+          "batches",
+          "billingBundleId",
+          "departmentId",
+          "discount",
+          "discountType",
+          "id",
+          "name",
+          "price",
+          "productId",
+          "quantity",
+          "unit",
+          "unitPrice",
+          "vatPercentage"
+        ],
+        "billingServices": [
+          "billingBundleId",
+          "departmentId",
+          "discount",
+          "discountType",
+          "id",
+          "name",
+          "price",
+          "quantity",
+          "serviceId",
+          "unitPrice",
+          "vatPercentage"
+        ],
+        "billingBundles": [
+          "departmentId",
+          "id",
+          "name",
+          "parentBillingBundleId",
+          "storeBundleId"
+        ]
+      },
+      "enums": {
+        "status": [
+          "estimate",
+          "draft",
+          "completed",
+          "archived"
+        ],
+        "paymentStatus": [
+          "paid",
+          "partially_paid",
+          "unpaid",
+          "cancelled"
+        ]
+      }
+    },
+    "payments": {
+      "path": "/v1/financials/payments",
+      "fields": [
+        "amount",
+        "clientId",
+        "companyId",
+        "createdAt",
+        "id",
+        "isOnline",
+        "method",
+        "name",
+        "status",
+        "storeId",
+        "storeInvoiceId",
+        "updatedAt"
+      ],
+      "nested": {},
+      "enums": {
+        "status": [
+          "archived",
+          "authorized",
+          "cancelled",
+          "captured",
+          "completed",
+          "failed",
+          "pending",
+          "processing",
+          "refunded",
+          "voided"
+        ],
+        "method": [
+          "bank_transfer",
+          "card",
+          "cash",
+          "cheque",
+          "credit",
+          "dojo",
+          "insurance",
+          "lupa_terminal",
+          "online",
+          "paid_for_by_store",
+          "other"
+        ]
+      }
+    },
+    "creditNotes": {
+      "path": "/v1/financials/credit-notes",
+      "fields": [
+        "additionalCreditAmount",
+        "amount",
+        "clientId",
+        "companyId",
+        "createdAt",
+        "id",
+        "isRefundable",
+        "issuedAt",
+        "items",
+        "petId",
+        "reason",
+        "status",
+        "storeId",
+        "storeInvoiceId",
+        "updatedAt"
+      ],
+      "nested": {
+        "items": [
+          "billingProduct",
+          "billingProductId",
+          "billingService",
+          "billingServiceId",
+          "creditQuantity",
+          "id",
+          "lineItemAmount"
+        ]
+      },
+      "enums": {
+        "reason": [
+          "DISSATISFIED_CLIENT",
+          "GOODS_DAMAGED",
+          "GOODS_NOT_COLLECTED_BY_CLIENT",
+          "GOODS_NOT_REQUIRED_BY_CLIENT",
+          "MEDICATION_NOT_SUITABLE",
+          "SOLD_IN_ERROR",
+          "STORE_PROVIDED_VOUCHER",
+          "STORE_INCENTIVE_SCHEME",
+          "UNKNOWN_DUE_TO_MIGRATION",
+          "EARLY_PAYMENT_CREDIT"
+        ],
+        "status": [
+          "draft",
+          "issued",
+          "void"
+        ]
+      }
+    },
+    "refunds": {
+      "path": "/v1/financials/refunds",
+      "fields": [
+        "amount",
+        "clientId",
+        "companyId",
+        "createdAt",
+        "id",
+        "paymentId",
+        "reason",
+        "status",
+        "storeId",
+        "updatedAt"
+      ],
+      "nested": {},
+      "enums": {
+        "status": [
+          "DRAFT",
+          "PENDING",
+          "COMPLETED",
+          "CANCELLED"
+        ],
+        "reason": [
+          "UNKNOWN",
+          "SOLD_IN_ERROR",
+          "GOODS_NOT_COLLECTED_BY_CLIENT",
+          "GOODS_NOT_RECEIVED_BY_CLIENT",
+          "OVERPAYMENT",
+          "EXTERNAL"
+        ]
+      }
+    },
+    "estimates": {
+      "path": "/v1/financials/estimates",
+      "fields": [
+        "activeFrom",
+        "amountDue",
+        "amountPaid",
+        "billingProducts",
+        "billingServices",
+        "clientId",
+        "companyId",
+        "createdAt",
+        "createdByEmployeeId",
+        "discountAmount",
+        "discountType",
+        "dueOn",
+        "id",
+        "invoiceNumber",
+        "paymentStatus",
+        "petId",
+        "storeId",
+        "updatedAt",
+        "updatedByEmployeeId"
+      ],
+      "nested": {
+        "billingProducts": [
+          "batches",
+          "discount",
+          "discountType",
+          "id",
+          "name",
+          "price",
+          "productId",
+          "quantity",
+          "unit",
+          "unitPrice",
+          "vatPercentage"
+        ],
+        "billingServices": [
+          "discount",
+          "discountType",
+          "id",
+          "name",
+          "price",
+          "quantity",
+          "serviceId",
+          "unitPrice",
+          "vatPercentage"
+        ]
+      },
+      "enums": {
+        "paymentStatus": [
+          "paid",
+          "partially_paid",
+          "unpaid",
+          "cancelled"
+        ]
+      }
+    },
+    "employees": {
+      "path": "/v1/employees",
+      "fields": [
+        "companyId",
+        "createdAt",
+        "email",
+        "firstName",
+        "id",
+        "lastName",
+        "phone",
+        "rcvsRegistrationNumber",
+        "role",
+        "status",
+        "stores",
+        "updatedAt",
+        "visitTypes"
+      ],
+      "nested": {
+        "stores": [
+          "id",
+          "isOnlineBookingPoc",
+          "showInCalendar"
+        ],
+        "visitTypes": [
+          "id",
+          "name"
+        ]
+      },
+      "enums": {}
+    },
+    "insurancePolicies": {
+      "path": "/v1/insurance-policies",
+      "fields": [
+        "createdAt",
+        "id",
+        "insurerId",
+        "insurerName",
+        "isArchived",
+        "petId",
+        "policyHolderName",
+        "policyNumber",
+        "updatedAt"
+      ],
+      "nested": {},
+      "enums": {}
+    },
+    "stores": {
+      "path": "/v1/companies/stores",
+      "fields": [
+        "address",
+        "categories",
+        "companyId",
+        "createdAt",
+        "currencyCode",
+        "description",
+        "hours",
+        "id",
+        "name",
+        "onlineBookingEnabled",
+        "vatPercentage"
+      ],
+      "nested": {},
+      "enums": {}
+    },
+    "paymentTerms": {
+      "path": "/v1/payment-terms",
+      "fields": [
+        "companyId",
+        "createdAt",
+        "earlyPaymentCreditConfig",
+        "id",
+        "invoiceMessage",
+        "isArchived",
+        "isDefault",
+        "lateFeeConfig",
+        "name",
+        "periodDays",
+        "periodType",
+        "updatedAt"
+      ],
+      "nested": {},
+      "enums": {
+        "periodType": [
+          "end_of_invoiced_month",
+          "end_of_following_month",
+          "end_of_invoiced_week",
+          "days_after_invoice_date"
+        ]
+      }
+    },
+    "referenceLists": {
+      "path": "/v1/reference-lists",
+      "fields": [
+        "companyId",
+        "createdAt",
+        "description",
+        "diagnosticProviderType",
+        "id",
+        "isArchived",
+        "lockedProperties",
+        "name",
+        "parentReferenceListDefaultPricingFormula",
+        "parentReferenceListId",
+        "storeId",
+        "type",
+        "updatedAt"
+      ],
+      "nested": {},
+      "enums": {
+        "type": [
+          "products",
+          "services"
+        ]
+      }
+    },
+    "appointmentTypes": {
+      "path": "/v1/appointment-types",
+      "fields": [
+        "category",
+        "companyId",
+        "createdAt",
+        "description",
+        "duration",
+        "id",
+        "isArchived",
+        "isPricePublic",
+        "isPublic",
+        "name",
+        "onlineBookingOrder",
+        "onlineBookingsPermittedWindow",
+        "price",
+        "storeId",
+        "updatedAt"
+      ],
+      "nested": {},
+      "enums": {}
+    }
+  }
+}

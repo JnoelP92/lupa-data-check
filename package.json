@@ -10,7 +10,9 @@
     "lupa-check": "./bin/lupa-check"
   },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "check:fields": "node scripts/check-fields.js",
+    "sync:spec": "node scripts/sync-spec.js"
   },
   "license": "UNLICENSED",
   "private": true

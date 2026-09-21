@@ -18,7 +18,6 @@ export default {
       { label: 'By subscriber type', breakdown: breakdown(rows, (s) => s.subscriberType) },
       { label: 'By plan', breakdown: breakdown(rows, (s) => s.healthPlanId) },
       { label: 'Cancellations by reason', breakdown: breakdown(rows.filter((s) => lower(s.status) === 'cancelled'), (s) => s.cancellationReason) },
-      { label: 'Payment not enabled', value: rows.filter((s) => s.paymentEnabled === false).length },
       { label: 'Never used an allowance', value: rows.filter((s) => !(s.usages ?? []).length).length },
     ];
   },
@@ -94,13 +93,6 @@ export default {
       group: true,
       run: (ctx, rows) => collisions(rows.filter((s) => lower(s.status) === 'active'), (s) => `${s.subscriberId}|${s.healthPlanId}`)
         .flatMap(([key, group]) => group.map((s) => ({ record: s, display: subscriberName(ctx, s), groupKey: key, fields: { plan: s.healthPlanId, startedOn: s.startedOn } }))),
-    },
-    {
-      id: 'subscriptions.payment.notEnabled', severity: 'review',
-      title: 'Active subscription to a paid plan with payment not enabled',
-      run: (ctx, rows) => rows.filter((s) => s.paymentEnabled === false && lower(s.status) === 'active' && (ctx.ix.planPrice.get(s.healthPlanId) ?? 0) > 0).map((s) => ({
-        record: s, display: subscriberName(ctx, s), fields: { plan: s.healthPlanId },
-      })),
     },
     {
       id: 'subscriptions.payment.noDay', severity: 'review',

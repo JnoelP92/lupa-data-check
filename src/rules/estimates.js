@@ -4,7 +4,7 @@
 // invoice for the same client and pet in the 30 days after the estimate. It will
 // over-report at practices that invoice long after the estimate, which is why it is
 // Review rather than Critical.
-import { isBlank, money, parseDate, breakdown } from '../util.js';
+import { isBlank, money, parseDate } from '../util.js';
 import { expectedTotal } from './invoices.js';
 
 const label = (e) => e.invoiceNumber ?? e.id?.slice(0, 8) ?? '(estimate)';
@@ -40,7 +40,6 @@ export default {
     });
     return [
       { label: 'Total estimates', value: rows.length },
-      { label: 'By status', breakdown: breakdown(rows, (e) => e.status) },
       { label: 'Total estimated', value: money(rows.reduce((t, e) => t + Number(e.amountDue ?? 0), 0), ctx.currency) },
       { label: 'Never converted to an invoice', value: unconverted(ctx, rows).length },
       { label: 'Over 90 days old and still standalone', value: stale.length },

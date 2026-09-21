@@ -98,13 +98,20 @@ redacted sample will do.
 ## Checks
 
 ```bash
-npm test
+npm test                 # 44 tests, includes the field check
+npm run check:fields     # do the rules read fields the API actually returns?
+npm run sync:spec        # refresh spec-fields.json from the live OpenAPI spec
 ```
 
-42 tests against a synthetic practice in `test/fixture.js`: every record exists to trip
+`sync-spec.js` reduces Lupa's 1.3MB OpenAPI document to the ~19KB of field names the
+rules depend on, so `check-fields.js` runs offline and the snapshot is reviewable in a
+diff. Run `sync:spec` then `check:fields` whenever the API moves.
+
+44 tests against a synthetic practice in `test/fixture.js`: every record exists to trip
 a named rule, so a failure names a rule rather than shifting a count somewhere
 downstream. Control records (`c0001`, `p01`, `pr01`, …) are asserted never to appear in
-any finding. No key, no network.
+any finding, and the client-facing output is asserted to contain no UUIDs at all. No
+key, no network.
 
 ## What the client never sees
 
@@ -115,15 +122,17 @@ leaks.
 
 ## Status
 
-All 19 rule modules are implemented — 228 rules covering every category in the spec.
-Three specified rules cannot be built against the current API and are named in
-`references/ruleset-v1.md` rather than quietly omitted.
+All 20 rule modules are implemented — 230 rules covering every category in the spec.
+Where the API differs from the spec document, `references/ruleset-v1.md` says so and
+names each rule that had to change or go, rather than leaving code that quietly matches
+nothing.
 
-Two things to do before trusting a real run:
+Field names are validated against the real OpenAPI spec — that check found and fixed 19
+rules reading fields that do not exist, including most of the services module.
 
-1. **Validate the invoice and client-balance formulas** against known-good records, as
-   the spec says. They are the rules most likely to produce a wall of false Criticals
-   at a practice whose bundle pricing differs from the assumption.
-2. **Check for rules that fire zero times across a large collection.** Field names come
-   from the spec document, not from a live response, and a field that does not exist
-   looks exactly like a clean pass.
+One thing still to do before trusting a real run: **validate the invoice and
+client-balance formulas** against known-good records, as the spec says. They are the
+rules most likely to produce a wall of false Criticals at a practice whose bundle
+pricing differs from the assumption. Enum *values* are also unverified where the spec
+declares none (appointment status, dispense tracking mode) — the status breakdown in
+each tally is the check.

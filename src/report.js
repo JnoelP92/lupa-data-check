@@ -103,7 +103,7 @@ export function renderMarkdown(report) {
           const fieldKeys = [...new Set(finding.rows.flatMap((r) => Object.keys(r.fields)))];
           const headers = ['Name', ...fieldKeys, ...(finding.grouped ? ['Shared with'] : []), 'Open in Lupa'];
           out.push(mdTable(headers, finding.rows.map((r) => {
-            const l = link(finding.linkType ?? section.linkType, { id: r.id, ...r.fields });
+            const l = r.link ?? link(finding.linkType ?? section.linkType, { id: r.id, ...r.fields });
             const open = l.url ? `[Open ↗](${l.url})${l.search ? ` — search \`${l.search}\`` : ''}` : '—';
             return [r.display, ...fieldKeys.map((k) => r.fields[k]), ...(finding.grouped ? [r.reason ?? ''] : []), open];
           })));

@@ -19,6 +19,19 @@ export default {
   label: 'Clinical notes',
   linkType: 'clinicalNote',
 
+  // A note has no page of its own and no petId. When it is filed against a pet the
+  // entityId IS the pet; when it is filed against an appointment the pet comes from
+  // there. Anything else gets no link rather than a wrong one.
+  linkFor(ctx, note) {
+    const petId = lower(note.entityType) === 'pet'
+      ? note.entityId
+      : lower(note.entityType) === 'appointment'
+        ? ctx.ix.appointmentPet.get(note.entityId)
+        : null;
+    if (!petId || !ctx.ix.petIds.has(petId)) return { url: null };
+    return { url: `https://work.lupapets.com/pets/${petId}`, note: 'Notes tab' };
+  },
+
   tally(ctx, rows) {
     return [
       { label: 'Total notes', value: rows.length },

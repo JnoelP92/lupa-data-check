@@ -69,12 +69,18 @@ const EXPECTED = {
     'products.state.sellableArchived': ['pr33'],
   },
   services: {
-    'services.price.negative': ['sv02'], 'services.price.freeButSellable': ['sv03'],
-    'services.margin.negative': ['sv02', 'sv03', 'sv04'],  // negative and free are also loss-making 'services.margin.huge': ['sv05'],
-    'services.vat.unexpected': ['sv06'], 'services.category.miscategorised': ['sv08'],
-    'services.name.soundsLikeProduct': ['sv09'], 'services.ref.store': ['sv10'],
-    'services.ref.referenceList': ['sv11'], 'services.duplicate.name': ['sv12', 'sv13'],
-    'services.state.sellableArchived': ['sv14'],
+    'services.price.negative': ['sv02'], 'services.price.zero': ['sv03'],
+    'services.margin.negative': ['sv04'], 'services.margin.huge': ['sv05'],
+    'services.category.otherOrFee': ['sv06', 'sv07'],
+    'services.category.miscategorised': ['sv07'],
+    'services.name.soundsLikeProduct': ['sv08'], 'services.ref.store': ['sv09'],
+    'services.ref.referenceList': ['sv10'], 'services.duplicate.name': ['sv11', 'sv12'],
+  },
+  insurancePolicies: {
+    'insurance.ref.pet': ['ip02'], 'insurance.policyNumber.missing': ['ip03'],
+    'insurance.holder.missing': ['ip04'],
+    'insurance.duplicate.policyNumber': ['ip05', 'ip06'],
+    'insurance.deceased.activePolicy': ['ip07'],
   },
   bundles: {
     'bundles.price.negative': ['bn03'], 'bundles.nesting.self': ['bn04'],
@@ -90,7 +96,7 @@ const EXPECTED = {
     'subscriptions.status.cancelledNoEnd': ['sb04'], 'subscriptions.status.stuckSignup': ['sb05'],
     'subscriptions.ref.subscriber': ['sb06'], 'subscriptions.ref.plan': ['sb07'],
     'subscriptions.state.deceasedPet': ['sb08'], 'subscriptions.state.archivedClient': ['sb09'],
-    'subscriptions.duplicate.active': ['sb10', 'sb11'], 'subscriptions.payment.notEnabled': ['sb12'],
+    'subscriptions.duplicate.active': ['sb10', 'sb11'],
     'subscriptions.payment.noDay': ['sb13'],
   },
   reminders: {
@@ -146,6 +152,7 @@ const EXPECTED = {
   },
   creditNotes: {
     'creditNotes.amount.invalid': ['cn02'], 'creditNotes.items.none': ['cn02'],
+    'creditNotes.reason.migration': ['cn09'],
     'creditNotes.status.issuedNoDate': ['cn03'], 'creditNotes.status.draftWithDate': ['cn04'],
     'creditNotes.ref.client': ['cn05'], 'creditNotes.ref.invoice': ['cn06'],
     'creditNotes.ref.pet': ['cn07'], 'creditNotes.items.notOnInvoice': ['cn08'],
@@ -179,7 +186,7 @@ for (const [key, rules] of Object.entries(EXPECTED)) {
 
 test('control records are never flagged', () => {
   const { sections } = run();
-  const clean = { clients: 'c0001', pets: 'p01', appointments: 'ap01', products: 'pr01', services: 'sv01', prescriptions: 'rx01', medicalRecords: 'mr01', reminders: 'rm01', employees: 'e01' };
+  const clean = { clients: 'c0001', pets: 'p01', appointments: 'ap01', products: 'pr01', services: 'sv01', prescriptions: 'rx01', medicalRecords: 'mr01', reminders: 'rm01', employees: 'e01', insurancePolicies: 'ip01' };
   const exempt = new Set([
     'clients.balance.nonZero',           // c0001 has none, but other rules list many
     'reminders.duplicate.name',          // rm01 legitimately collides with rm08
@@ -207,6 +214,7 @@ test('duplicate matching normalises case, whitespace and phone formatting', () =
   assert.deepEqual(ids(sections, 'clients', 'clients.duplicate.email'), ['c0008', 'c0009']);
   assert.deepEqual(ids(sections, 'clients', 'clients.duplicate.phone'), ['c0010', 'c0011']);
   assert.deepEqual(ids(sections, 'products', 'products.duplicate.name'), ['pr31', 'pr32']);
+  assert.deepEqual(ids(sections, 'services', 'services.duplicate.name'), ['sv11', 'sv12']);
 });
 
 test('invoice reconciliation flags only genuine mismatches', () => {
@@ -223,12 +231,12 @@ test('invoice reconciliation flags only genuine mismatches', () => {
 test('client balance reconciliation matches a hand-worked example', () => {
   const { sections } = run();
   const rows = finding(sections, 'crossRecord', 'cross.balance.clientMismatch').rows;
-  // c0001: £210 invoiced (completed) − £40 paid − £5 non-refundable credit = £165 expected,
+  // c0001: £210 invoiced (completed) − £40 paid − £30 non-refundable credit = £140 expected,
   // against a stored balance of £0.
   const c1 = rows.find((r) => r.id === 'c0001');
-  assert.equal(c1.fields.expected, '£165.00');
+  assert.equal(c1.fields.expected, '£140.00');
   assert.equal(c1.fields.actual, '£0.00');
-  assert.equal(c1.fields.delta, '-£165.00');
+  assert.equal(c1.fields.delta, '-£140.00');
   // c0014 and c0015 are seeded to reconcile exactly and must not appear.
   assert.ok(!rows.some((r) => r.id === 'c0014'), 'c0014 reconciles');
   assert.ok(!rows.some((r) => r.id === 'c0015'), 'c0015 reconciles (payment + non-refundable credit)');

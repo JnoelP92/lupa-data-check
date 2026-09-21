@@ -61,7 +61,6 @@ export default {
       { label: 'With a negative line', value: rows.filter((i) => lines(i).some((l) => Number(l.price ?? 0) < 0)).length },
       { label: 'With a bundle', value: rows.filter((i) => (i.billingBundles ?? []).length).length },
       { label: 'With no lines at all', value: rows.filter((i) => !lines(i).length && !(i.billingBundles ?? []).length).length },
-      { label: 'Linked to an appointment', value: rows.filter((i) => !isBlank(i.appointmentId)).length },
       { label: 'With an invoice-level discount', value: rows.filter((i) => Number(i.discountAmount ?? 0) > 0).length },
       {
         label: 'Aged receivables',
@@ -171,7 +170,7 @@ export default {
       truncate: 25,
       run: (ctx, rows) => rows.flatMap((i) => lines(i).filter((l) => Number(l.price ?? 0) < 0).map((l) => ({
         record: i, display: label(i),
-        fields: { line: l.name ?? l.productName ?? l.serviceName, price: money(l.price, ctx.currency), quantity: l.quantity },
+        fields: { line: l.name, price: money(l.price, ctx.currency), quantity: l.quantity },
       }))),
     },
     {
@@ -179,7 +178,7 @@ export default {
       title: 'Invoice line with zero quantity',
       truncate: 25,
       run: (ctx, rows) => rows.flatMap((i) => lines(i).filter((l) => Number(l.quantity ?? 0) === 0).map((l) => ({
-        record: i, display: label(i), fields: { line: l.name ?? l.productName ?? l.serviceName, price: money(l.price, ctx.currency) },
+        record: i, display: label(i), fields: { line: l.name, price: money(l.price, ctx.currency) },
       }))),
     },
     {
@@ -188,9 +187,9 @@ export default {
       truncate: 25,
       run: (ctx, rows) => rows.flatMap((i) => [
         ...(i.billingProducts ?? []).filter((l) => Number(l.unitPrice ?? 0) === 0 && (ctx.ix.productPrice.get(l.productId) ?? 0) > 0)
-          .map((l) => ({ record: i, display: label(i), fields: { line: l.name ?? l.productName, catalogue: money(ctx.ix.productPrice.get(l.productId), ctx.currency) } })),
+          .map((l) => ({ record: i, display: label(i), fields: { line: l.name, catalogue: money(ctx.ix.productPrice.get(l.productId), ctx.currency) } })),
         ...(i.billingServices ?? []).filter((l) => Number(l.unitPrice ?? 0) === 0 && (ctx.ix.servicePrice.get(l.serviceId) ?? 0) > 0)
-          .map((l) => ({ record: i, display: label(i), fields: { line: l.name ?? l.serviceName, catalogue: money(ctx.ix.servicePrice.get(l.serviceId), ctx.currency) } })),
+          .map((l) => ({ record: i, display: label(i), fields: { line: l.name, catalogue: money(ctx.ix.servicePrice.get(l.serviceId), ctx.currency) } })),
       ]),
     },
     {
@@ -200,7 +199,7 @@ export default {
         .filter((l) => l.discountType !== '%' && Number(l.discount ?? 0) > Number(l.unitPrice ?? 0) * Number(l.quantity ?? 0))
         .map((l) => ({
           record: i, display: label(i),
-          fields: { line: l.name ?? l.productName ?? l.serviceName, discount: money(l.discount, ctx.currency), lineTotal: money(Number(l.unitPrice ?? 0) * Number(l.quantity ?? 0), ctx.currency) },
+          fields: { line: l.name, discount: money(l.discount, ctx.currency), lineTotal: money(Number(l.unitPrice ?? 0) * Number(l.quantity ?? 0), ctx.currency) },
         }))),
     },
     {
@@ -208,7 +207,7 @@ export default {
       title: 'Percentage discount over 100%',
       run: (ctx, rows) => rows.flatMap((i) => lines(i)
         .filter((l) => l.discountType === '%' && Number(l.discount ?? 0) > 100)
-        .map((l) => ({ record: i, display: label(i), fields: { line: l.name ?? l.productName ?? l.serviceName, discount: `${l.discount}%` } }))),
+        .map((l) => ({ record: i, display: label(i), fields: { line: l.name, discount: `${l.discount}%` } }))),
     },
     {
       id: 'invoices.line.vatUnexpected', severity: 'review',
@@ -216,7 +215,7 @@ export default {
       truncate: 25,
       run: (ctx, rows) => rows.flatMap((i) => lines(i)
         .filter((l) => !isBlank(l.vatPercentage) && !ctx.vatRates.includes(Number(l.vatPercentage)))
-        .map((l) => ({ record: i, display: label(i), fields: { line: l.name ?? l.productName ?? l.serviceName, vatPercentage: l.vatPercentage } }))),
+        .map((l) => ({ record: i, display: label(i), fields: { line: l.name, vatPercentage: l.vatPercentage } }))),
     },
     {
       id: 'invoices.line.danglingProduct', severity: 'info',
@@ -225,7 +224,7 @@ export default {
       truncate: 25,
       run: (ctx, rows) => rows.flatMap((i) => (i.billingProducts ?? [])
         .filter((l) => !isBlank(l.productId) && !ctx.ix.productIds.has(l.productId))
-        .map((l) => ({ record: i, display: label(i), fields: { line: l.name ?? l.productName, danglingProductId: l.productId } }))),
+        .map((l) => ({ record: i, display: label(i), fields: { line: l.name, danglingProductId: l.productId } }))),
     },
     {
       id: 'invoices.line.danglingService', severity: 'info',
@@ -233,7 +232,7 @@ export default {
       truncate: 25,
       run: (ctx, rows) => rows.flatMap((i) => (i.billingServices ?? [])
         .filter((l) => !isBlank(l.serviceId) && !ctx.ix.serviceIds.has(l.serviceId))
-        .map((l) => ({ record: i, display: label(i), fields: { line: l.name ?? l.serviceName, danglingServiceId: l.serviceId } }))),
+        .map((l) => ({ record: i, display: label(i), fields: { line: l.name, danglingServiceId: l.serviceId } }))),
     },
     {
       id: 'invoices.duplicate.number', severity: 'critical',

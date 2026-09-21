@@ -18,7 +18,7 @@ export default {
       { label: 'With no store assigned', value: rows.filter((e) => !(e.stores ?? []).length).length },
       { label: 'With no visit types', value: rows.filter((e) => !(e.visitTypes ?? []).length).length },
       { label: 'Hidden on every calendar', value: rows.filter((e) => (e.stores ?? []).length && (e.stores ?? []).every((s) => s.showInCalendar === false)).length },
-      { label: 'Online booking point of contact', value: rows.filter((e) => e.isOnlineBookingPoc === true).length },
+      { label: 'Online booking point of contact', value: rows.filter((e) => (e.stores ?? []).some((s) => s.isOnlineBookingPoc === true)).length },
     ];
   },
 

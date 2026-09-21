@@ -36,6 +36,7 @@ export const COLLECTIONS = [
   { key: 'creditNotes', path: '/v1/financials/credit-notes', label: 'Credit notes' },
   { key: 'refunds', path: '/v1/financials/refunds', label: 'Refunds' },
   { key: 'estimates', path: '/v1/financials/estimates', label: 'Estimates' },
+  { key: 'insurancePolicies', path: '/v1/insurance-policies', label: 'Insurance policies' },
 ];
 
 export const ENVIRONMENTS = {

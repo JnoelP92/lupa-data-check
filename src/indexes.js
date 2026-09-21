@@ -41,6 +41,9 @@ export function buildIndexes(store, { log = () => {} } = {}) {
     invoiceLineKeys: new Set(),  // `${invoiceId}|${billingProductId}` and billingServiceId
     appointmentsByPet: new Map(),// petId -> count
     invoicedPets: new Set(),
+    insuredPetIds: new Set(),
+    appointmentInvoice: new Map(),// appointmentId -> storeInvoiceId
+    appointmentPet: new Map(), // appointmentId -> petId
   };
 
   for (const c of store.read('clients')) {
@@ -54,6 +57,7 @@ export function buildIndexes(store, { log = () => {} } = {}) {
     if (p.deceased === true) ix.petIsDeceased.add(p.id);
     const owners = (p.clientsPets ?? []).map((cp) => cp.clientId).filter(Boolean);
     ix.petOwners.set(p.id, owners);
+    // Pets have no isArchived of their own — archival is per owner link.
     if ((p.clientsPets ?? []).length && (p.clientsPets ?? []).every((cp) => cp.isArchived === true)) ix.petIsArchived.add(p.id);
     ix.petName.set(p.id, p.name ?? '(unnamed)');
   }
@@ -66,6 +70,10 @@ export function buildIndexes(store, { log = () => {} } = {}) {
   for (const a of store.read('appointments')) {
     ix.appointmentIds.add(a.id);
     if (a.petId) ix.appointmentsByPet.set(a.petId, (ix.appointmentsByPet.get(a.petId) ?? 0) + 1);
+    // The invoice does not point at the appointment; the appointment points at the
+    // invoice. Everything downstream reads this map rather than inventing the reverse.
+    if (a.storeInvoiceId) ix.appointmentInvoice.set(a.id, a.storeInvoiceId);
+    if (a.petId) ix.appointmentPet.set(a.id, a.petId);
   }
   for (const i of store.read('invoices')) {
     ix.invoiceIds.add(i.id);
@@ -75,6 +83,7 @@ export function buildIndexes(store, { log = () => {} } = {}) {
     for (const l of i.billingServices ?? []) if (!isBlank(l.id)) ix.invoiceLineKeys.add(`${i.id}|${l.id}`);
   }
   for (const p of store.read('payments')) { ix.paymentIds.add(p.id); ix.paymentAmount.set(p.id, Number(p.amount ?? 0)); }
+  for (const p of store.read('insurancePolicies')) { if (p.isArchived !== true && p.petId) ix.insuredPetIds.add(p.petId); }
 
   // Employees also come from the reference pull; union the two so a company whose
   // employees endpoint paginates differently still resolves.

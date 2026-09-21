@@ -46,7 +46,7 @@ export default {
       { label: 'Over expected lifespan', value: plural(elderly.length, 'pet') },
       { label: 'Microchipped flag set', value: rows.filter((p) => p.microchipped === true).length },
       { label: 'Microchip number present', value: rows.filter((p) => !isBlank(p.microchip)).length },
-      { label: 'Insurance active', value: rows.filter((p) => lower(p.insuranceStatus) === 'active').length },
+      { label: 'With an active insurance policy', value: rows.filter((p) => ctx.ix.insuredPetIds.has(p.id)).length },
     ];
   },
 
@@ -138,8 +138,7 @@ export default {
       id: 'pets.owner.allArchived', severity: 'review',
       title: 'Live pet whose every owner link is archived',
       run: (ctx, rows) => rows.filter((p) =>
-        (p.clientsPets ?? []).length && (p.clientsPets ?? []).every((cp) => cp.isArchived === true) &&
-        p.deceased !== true && p.isArchived !== true,
+        (p.clientsPets ?? []).length && (p.clientsPets ?? []).every((cp) => cp.isArchived === true) && p.deceased !== true,
       ).map((p) => ({ record: p, display: p.name ?? '(unnamed)', fields: { species: p.species } })),
     },
     {
@@ -175,14 +174,6 @@ export default {
         record: p, display: p.name ?? '(unnamed)', groupKey: key,
         fields: { species: p.species, dob: p.dob, owner: owners(p)[0] },
       }))),
-    },
-    {
-      id: 'pets.insurance.statusWithoutPolicy', severity: 'review',
-      title: 'Insurance marked active but no policy record exists',
-      needs: 'insurancePolicies',
-      run: (ctx, rows) => rows.filter((p) => lower(p.insuranceStatus) === 'active' && !(p.insurancePolicies ?? []).length).map((p) => ({
-        record: p, display: p.name ?? '(unnamed)', fields: { insuranceStatus: p.insuranceStatus, insurer: p.insurer },
-      })),
     },
   ],
 };
