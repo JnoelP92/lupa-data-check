@@ -83,7 +83,24 @@ export function buildContext(dir, { now = new Date(), log = () => {} } = {}) {
     _loaded: new Map(),
   };
 
+  // How big each reference set actually came back. A set that is EMPTY is different
+  // from one that failed to load, and worse: the endpoint answered, so nothing is
+  // recorded as unavailable, and every record referencing it gets reported as dangling.
+  // On a practice with 36k clients that is a wall of false criticals that reads as a
+  // catastrophic finding. Rules depending on an empty set are skipped instead — if the
+  // set is genuinely empty and nothing references it, the rule would have found nothing
+  // anyway, so skipping costs nothing and never lies.
+  ctx.referenceSizes = {
+    stores: ctx.storeIds.size,
+    paymentTerms: ctx.paymentTermIds.size,
+    appointmentTypes: ctx.appointmentTypeIds.size,
+    referenceLists: ctx.referenceListIds.size,
+    stockLocations: ctx.stockLocationIds.size,
+  };
+
   ctx.ix = buildIndexes(store, { log });
+  ctx.referenceSizes.employees = ctx.ix.employeeIds.size;
+  ctx.referenceSizes.clients = ctx.ix.clientIds.size;
 
   // Load a collection on demand; the engine releases it once its module has run.
   ctx.load = (key) => {
@@ -108,9 +125,15 @@ export function runRules(ctx, { modules = MODULES, only } = {}) {
     const skipped = [];
 
     for (const rule of mod.rules) {
-      const missing = (rule.needs ? [rule.needs].flat() : []).find((n) => ctx.unavailable.has(n));
-      if (missing) {
-        skipped.push({ id: rule.id, title: rule.title, reason: `reference set "${missing}" was not readable with this key` });
+      const needs = rule.needs ? [rule.needs].flat() : [];
+      const unreadable = needs.find((n) => ctx.unavailable.has(n));
+      if (unreadable) {
+        skipped.push({ id: rule.id, title: rule.title, reason: `reference set "${unreadable}" was not readable with this key` });
+        continue;
+      }
+      const empty = needs.find((n) => ctx.referenceSizes?.[n] === 0);
+      if (empty) {
+        skipped.push({ id: rule.id, title: rule.title, reason: `reference set "${empty}" came back empty — every reference would be reported as dangling` });
         continue;
       }
       let hits;

@@ -40,7 +40,7 @@ export function storeToken(root, key) {
       encoding: 'utf8',
     });
     if (r.status !== 0) throw new Error(r.stderr?.trim() || 'keychain write failed');
-    return 'login keychain (lupa-api/current)';
+    return `login keychain (${SERVICE}/${ACCOUNT})`;
   }
   const envPath = join(root, '.env');
   writeFileSync(envPath, `LUPA_API_TOKEN=${key}\n`, { mode: 0o600 });

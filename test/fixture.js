@@ -440,7 +440,7 @@ export function makePull({ overrides = {}, unavailable = {}, now = '2026-09-20' 
   writeFileSync(join(dir, 'stores.json'), JSON.stringify([
     { id: STORE_A, name: 'Main Surgery' }, { id: STORE_B, name: 'Branch Clinic' },
   ]));
-  writeFileSync(join(dir, 'paymentTerms.json'), JSON.stringify([{ id: TERMS, name: '30 days' }]));
+  writeFileSync(join(dir, 'paymentTerms.json'), JSON.stringify(overrides.paymentTerms ?? [{ id: TERMS, name: '30 days' }]));
   writeFileSync(join(dir, 'appointmentTypes.json'), JSON.stringify([{ id: VISIT_TYPE, name: 'Consult' }]));
   writeFileSync(join(dir, 'referenceLists.json'), JSON.stringify([{ id: REF_LIST, name: 'Main list' }]));
   writeFileSync(join(dir, 'stockLocations.json'), JSON.stringify([{ id: STORE_A, name: 'Main store' }]));

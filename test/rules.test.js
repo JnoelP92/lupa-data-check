@@ -324,3 +324,13 @@ test('markdown renders links, tables and the incomplete-pull warning', () => {
   const md2 = renderMarkdown(buildReport(warned.ctx, warned.sections));
   assert.match(md2, /Incomplete pull/);
 });
+
+test('a reference set that came back empty skips its rules instead of flagging everything', () => {
+  // The endpoint answered with [], so nothing is marked unavailable — but every client
+  // carrying a paymentTermsId would be reported as dangling.
+  const { sections } = run({ overrides: { paymentTerms: [] } });
+  assert.equal(finding(sections, 'clients', 'clients.ref.paymentTerms'), undefined, 'must not flag');
+  const skipped = section(sections, 'clients').skipped.find((s) => s.id === 'clients.ref.paymentTerms');
+  assert.ok(skipped, 'must be recorded as skipped');
+  assert.match(skipped.reason, /came back empty/);
+});
