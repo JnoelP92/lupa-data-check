@@ -82,8 +82,18 @@ npx github:JnoelP92/lupa-data-check key
 npx github:JnoelP92/lupa-data-check pull --env migrations --out <their folder>/out
 ```
 
-Then carry on from `check` against that folder. Everything after the pull — rules,
-report, client PDF, Dock copy, email, Linear — needs no network to Lupa at all.
+Then have them add that folder to the session and carry on from `check`. Everything
+after the pull — rules, report, client PDF, Dock copy, email, Linear — needs no network
+to Lupa at all.
+
+**Do not offer to run the pull yourself once a folder is connected.** Connecting a
+folder mounts files into the sandbox; it does not give the sandbox the Mac's network.
+The egress proxy is still in front of every request. Offering it sends the user in a
+circle.
+
+If they have Claude Code on the same Mac, that is the better handoff than a raw
+terminal: it runs as an ordinary process with no proxy in front of it, so it can do the
+pull and hand back the folder.
 
 ## Reading the report
 

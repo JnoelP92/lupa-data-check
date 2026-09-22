@@ -15,15 +15,35 @@ const RULESET_VERSION = '1.0.0';
 export async function resolveContext(api, { companyId } = {}) {
   const companies = await api.listAll('/v1/companies');
   if (!companies.length) throw new Error('This key can see no companies.');
-  const company = companyId
-    ? companies.find((c) => c.id === companyId)
-    : companies.length === 1
-      ? companies[0]
-      : null;
-  if (!company) {
-    const list = companies.map((c) => `  ${c.id}  ${c.name}`).join('\n');
-    throw new Error(`This key sees ${companies.length} companies. Pass --company <id>:\n${list}`);
+
+  if (companyId) {
+    const picked = companies.find((c) => c.id === companyId);
+    if (!picked) throw new Error(`companyId ${companyId} is not visible to this key.`);
+    return { company: picked, stores: await api.listAll('/v1/companies/stores', { companyId: picked.id }) };
   }
+
+  let candidates = companies;
+  if (candidates.length > 1) {
+    // GET /v1/companies returns a company's own stores alongside it, with the same ids
+    // the stores endpoint reports. A row that is another row's store is not a separate
+    // practice, and treating it as one turns every multi-site clinic into a prompt
+    // asking the user to choose between a company and its own branches.
+    const storeIds = new Set();
+    for (const c of candidates) {
+      try {
+        for (const s of await api.listAll('/v1/companies/stores', { companyId: c.id })) storeIds.add(s.id);
+      } catch { /* a row that cannot list stores is not the company either */ }
+    }
+    const real = candidates.filter((c) => !storeIds.has(c.id));
+    if (real.length) candidates = real;
+  }
+
+  if (candidates.length !== 1) {
+    const list = candidates.map((c) => `  ${c.id}  ${c.name}`).join('\n');
+    throw new Error(`This key sees ${candidates.length} companies. Pass --company <id>:\n${list}`);
+  }
+
+  const company = candidates[0];
   const stores = await api.listAll('/v1/companies/stores', { companyId: company.id });
   return { company, stores };
 }
