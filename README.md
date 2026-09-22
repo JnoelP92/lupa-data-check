@@ -14,9 +14,8 @@ client.
 whole pass — pull, review, client report, Dock copy, draft email, Linear tickets —
 happens in one session.
 
-**Or open this folder as a project** in Claude Code. `.claude/skills` is a symlink to
-`skills/`, so the same skills load with no install step. That is the fallback if the
-marketplace cannot fetch a private repo.
+The plugin lives in `plugin/`, which is the layout every marketplace Cowork loads
+actually uses — a plugin sourced at the repo root (`"source": "./"`) fails to sync.
 
 **As a plain CLI**, anywhere with Node and network access to Lupa:
 
@@ -105,7 +104,7 @@ Do not try to route around the proxy. Ask for the allowlist entry.
 | `src/rules/` | one module per record type |
 | `src/report.js` | report.json and report.md |
 | `references/ruleset-v1.md` | the ruleset, and which parts are actually implemented |
-| `skills/` | the Cowork/Claude Code skills |
+| `plugin/` | the installable plugin: manifest and the two skills |
 | `test/` | fixture-driven rule tests — no key, no network |
 
 ## What a pull writes

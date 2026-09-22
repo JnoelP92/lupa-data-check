@@ -45,18 +45,20 @@ key is verified against `GET /v1/companies` first and a rejected key is never st
 
 ## Finding the tool
 
-The CLI ships inside this skill bundle, beside this file: `bin/lupa-check`. Resolve it
-once at the start of the session and reuse it — the skill directory is wherever this
-SKILL.md was loaded from:
+Resolve the CLI once at the start of the session and reuse it. In order of preference:
+
+1. **The user's project folder**, if they have the repo open: `bin/lupa-check`. Best,
+   because it is the copy they can update with `git pull`.
+2. **Beside this SKILL.md**, if this skill was installed from a uploaded zip bundle:
+   `bin/lupa-check` in the skill's own directory.
+3. **From GitHub**, otherwise — the repo is public, and package registries and GitHub
+   are reachable from the sandbox even when Lupa is not:
 
 ```bash
-LC="<this skill's directory>/bin/lupa-check"
-node "$LC" --help
+npx github:JnoelP92/lupa-data-check <command>
 ```
 
-If the user has the repo open as their project folder instead, `bin/lupa-check` from
-that folder is the same tool and is preferable, because it is the one they can update
-with `git pull`.
+Set `LC` to whichever you resolved and use it for every command below.
 
 ## Running the pass
 

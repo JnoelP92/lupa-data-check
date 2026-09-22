@@ -30,7 +30,7 @@ for (const skill of SKILLS) {
   const dir = join(STAGE, skill);
   mkdirSync(dir, { recursive: true });
 
-  cpSync(join(ROOT, 'skills', skill, 'SKILL.md'), join(dir, 'SKILL.md'));
+  cpSync(join(ROOT, 'plugin', 'skills', skill, 'SKILL.md'), join(dir, 'SKILL.md'));
   for (const item of PAYLOAD) {
     const from = join(ROOT, item);
     if (existsSync(from)) cpSync(from, join(dir, item), { recursive: true });

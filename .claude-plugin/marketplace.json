@@ -7,7 +7,7 @@
       "displayName": "Lupa Data Check",
       "description": "Read-only audit of a Lupa practice: pulls every record type via the public API, runs the migration data-quality ruleset, and produces the internal findings report plus the client-facing report, Dock copy, draft email and Linear tickets.",
       "category": "productivity",
-      "source": "./"
+      "source": "./plugin"
     }
   ]
 }
