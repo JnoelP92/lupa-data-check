@@ -114,6 +114,7 @@ export function renderClientReport(report, { verdicts, intro } = {}) {
 
 <h1>Data review — first pass</h1>
 <p class="lede">${esc(intro ?? 'These are the things we spotted while checking your data. Most need a decision from you rather than a fix from us — you will know which of these are how your practice actually works and which are genuinely wrong.')}</p>
+${(report.notChecked ?? []).length ? `<p class="lede"><strong>What this review did not cover:</strong> ${esc(report.notChecked.join(', '))}. No records came through for these, so we have not checked them — please do not read their absence here as a clean result.</p>` : ''}
 
 ${totals.length ? `<h3>Where the money stands</h3>
 <dl class="totals">${totals.map((t) => `<div><dt>${esc(t.label)}</dt><dd>${esc(t.value)}</dd></div>`).join('')}</dl>` : ''}

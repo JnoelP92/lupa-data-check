@@ -52,6 +52,20 @@ export const MODULES = [
 
 export const SEVERITIES = ['critical', 'review', 'info'];
 
+// No rule renders more than this many rows into the report, whatever it matched. The
+// full set always goes to findings.jsonl. A finding with 80,000 rows in a document is
+// not more informative than one with 100 rows and an honest total — it is just
+// unopenable.
+export const MAX_ROWS = 100;
+
+// A rule that matches most of its category is not listing exceptions, it is describing
+// the dataset. "236,515 prescriptions have no expiry date" is one fact about a
+// migration; printed as 236,515 findings it buries everything else in the report.
+// Findings over this share of their category are reported as characteristics instead,
+// counted separately from the actionable totals.
+export const SATURATION_SHARE = 0.5;
+export const SATURATION_MIN = 100;
+
 export function buildContext(dir, { now = new Date(), log = () => {} } = {}) {
   const store = new Store(dir);
   const meta = store.readJson('meta');
@@ -118,7 +132,7 @@ export function runRules(ctx, { modules = MODULES, only } = {}) {
 
   for (const mod of wanted) {
     // A module with no collection of its own (cross-record) gets an empty rows array.
-    const rows = mod.collection === null ? [] : ctx.load(mod.collection ?? mod.key);
+    const rows = mod.collection === null ? [] : mod.fromJson ? (ctx.store.readJson(mod.key, []) ?? []) : ctx.load(mod.collection ?? mod.key);
     ctx.rows = rows;
 
     const findings = [];
@@ -145,18 +159,35 @@ export function runRules(ctx, { modules = MODULES, only } = {}) {
       }
       if (!hits.length) continue;
 
-      const shown = rule.truncate ? hits.slice(0, rule.truncate) : hits;
+      const cap = Math.min(rule.truncate ?? MAX_ROWS, MAX_ROWS);
+      const scannedCount = rows.length || 1;
+      const systemic = hits.length >= SATURATION_MIN && hits.length / scannedCount >= SATURATION_SHARE;
+      // A saturated rule needs a handful of examples, not a hundred.
+      const shown = hits.slice(0, systemic ? 3 : cap);
+      // Duplicate rules list every member; the useful number is how many collisions
+      // there are. 302 products sharing one placeholder code is one problem.
+      const groupCount = rule.group ? new Set(hits.map((h) => h.groupKey)).size : null;
+
       findings.push({
         id: rule.id,
         severity: rule.severity,
+        systemic,
+        share: Math.round((hits.length / scannedCount) * 100),
+        groupCount,
         title: rule.title,
         clientFacing: rule.clientFacing ?? rule.title,
         why: rule.why ?? null,
         internalOnly: Boolean(rule.internalOnly),
         total: hits.length,
-        truncatedTo: rule.truncate && hits.length > rule.truncate ? rule.truncate : null,
+        truncatedTo: hits.length > shown.length ? shown.length : null,
         grouped: Boolean(rule.group),
         linkType: rule.linkType ?? mod.linkType,
+        // Every hit, for findings.jsonl; stripped before report.json is written.
+        allRows: hits.map((r) => ({
+          id: r.record?.id ?? r.id ?? null,
+          display: r.display,
+          fields: r.fields ?? {},
+        })),
         rows: shown.map((r) => ({
           id: r.record?.id ?? r.id ?? null,
           display: r.display,
@@ -170,8 +201,11 @@ export function runRules(ctx, { modules = MODULES, only } = {}) {
       });
     }
 
+    // Systemic findings are counted apart, so the headline numbers stay a list of
+    // things to work through rather than a restatement of the collection size.
+    const actionable = findings.filter((f) => !f.systemic);
     const counts = Object.fromEntries(
-      SEVERITIES.map((s) => [s, findings.filter((f) => f.severity === s).reduce((t, f) => t + f.total, 0)]),
+      SEVERITIES.map((s) => [s, actionable.filter((f) => f.severity === s).reduce((t, f) => t + f.total, 0)]),
     );
 
     let tally = [];
@@ -187,15 +221,19 @@ export function runRules(ctx, { modules = MODULES, only } = {}) {
       linkType: mod.linkType,
       clientFacing: mod.clientFacing !== false,
       scanned: mod.collection === null ? (ctx.counts[mod.scannedFrom] ?? 0) : rows.length,
-      ran: ctx.counts[mod.collection ?? mod.key] !== undefined || mod.collection === null,
+      // Zero records is not zero findings. A collection that came back empty has not
+      // been checked, and must never render as a category that passed.
+      empty: mod.collection !== null && rows.length === 0,
+      fromJson: Boolean(mod.fromJson),
       tally,
       findings: findings.sort((a, b) => SEVERITIES.indexOf(a.severity) - SEVERITIES.indexOf(b.severity)),
       skipped,
       counts,
+      systemicCount: findings.filter((f) => f.systemic).length,
       flagged: counts.critical + counts.review + counts.info,
     });
 
-    if (mod.collection !== null) ctx.release(mod.collection ?? mod.key);
+    if (mod.collection !== null && !mod.fromJson) ctx.release(mod.collection ?? mod.key);
     ctx.rows = undefined;
   }
 

@@ -21,6 +21,11 @@ export function renderDockCopy(report, { verdicts } = {}) {
   const totalReview = sections.reduce((t, s) => t + s.findings.filter((f) => f.severity === 'review').reduce((a, f) => a + f.total, 0), 0);
   out.push(`${totalCritical} items to fix before go-live, ${totalReview} to review.`);
   out.push('');
+  if ((report.notChecked ?? []).length) {
+    out.push(`NOT CHECKED - no records returned: ${report.notChecked.join(', ')}.`);
+    out.push('Not a clean result for these. Confirm whether the data is migrated yet.');
+    out.push('');
+  }
 
   for (const section of sections) {
     out.push(`${section.label.toUpperCase()}`);

@@ -104,7 +104,7 @@ function outDir(args) {
 
 function printSummary(report) {
   console.error('');
-  const w = Math.max(...report.summary.map((s) => s.category.length));
+  const w = report.summary.reduce((m, s) => Math.max(m, s.category.length), 0);
   for (const s of report.summary) {
     console.error(
       `  ${s.category.padEnd(w)}  scanned ${String(s.scanned).padStart(7)}` +
@@ -170,7 +170,7 @@ try {
       const report = buildReport(ctx, sections);
       const paths = writeReport(dir, report);
       printSummary(report);
-      console.error(`\nWrote ${paths.md} and ${paths.json}`);
+      console.error(`\nWrote ${paths.md}, ${paths.json} and ${paths.rows} (${paths.rowCount.toLocaleString()} flagged records)`);
       break;
     }
 

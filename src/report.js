@@ -5,7 +5,7 @@
 // The client-facing PDF is deliberately not produced here: section 5 requires
 // judgement (softened language, Info stripped, internal config rules removed) and that
 // pass happens in the skill, after the deployment team has reviewed the internal one.
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, createWriteStream } from 'node:fs';
 import { join } from 'node:path';
 import { SEVERITIES } from './rules/index.js';
 import { link } from './links.js';
@@ -19,12 +19,19 @@ export function buildReport(ctx, sections) {
     stores: ctx.meta.stores,
     pull: { startedAt: ctx.meta.startedAt, finishedAt: ctx.meta.finishedAt, requests: ctx.meta.requestCount },
     unavailable: ctx.meta.unavailable ?? {},
+    notChecked: sections.filter((s) => s.empty).map((s) => s.label),
+    characteristics: sections.flatMap((s) => s.findings.filter((f) => f.systemic).map((f) => ({
+      category: s.label, rule: f.id, title: f.title, severity: f.severity,
+      count: f.total, share: f.share, of: s.scanned,
+    }))).sort((a, b) => b.share - a.share),
     summary: sections.map((s) => ({
       category: s.label,
       scanned: s.scanned,
       flagged: s.flagged,
       ...Object.fromEntries(SEVERITIES.map((sev) => [sev, s.counts[sev]])),
+      systemic: s.systemicCount ?? 0,
       skipped: s.skipped.length,
+      empty: Boolean(s.empty),
     })),
     sections,
   };
@@ -32,10 +39,21 @@ export function buildReport(ctx, sections) {
 
 const pad = (v, n) => String(v ?? '').padEnd(n);
 
+// Built with loops rather than argument spreads. `Math.max(...rows.map(...))` and
+// `[...rows.map(line)]` both pass one argument per row, which blows the call stack
+// somewhere in the tens of thousands — and a real practice produces findings that big.
 function mdTable(headers, rows) {
-  const widths = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => String(r[i] ?? '').length)));
+  const widths = headers.map((h) => h.length);
+  for (const row of rows) {
+    for (let i = 0; i < widths.length; i++) {
+      const len = String(row[i] ?? '').length;
+      if (len > widths[i]) widths[i] = len;
+    }
+  }
   const line = (cells) => `| ${cells.map((c, i) => pad(c, widths[i])).join(' | ')} |`;
-  return [line(headers), `|${widths.map((w) => '-'.repeat(w + 2)).join('|')}|`, ...rows.map(line)].join('\n');
+  const out = [line(headers), `|${widths.map((w) => '-'.repeat(w + 2)).join('|')}|`];
+  for (const row of rows) out.push(line(row));
+  return out.join('\n');
 }
 
 export function renderMarkdown(report) {
@@ -52,17 +70,55 @@ export function renderMarkdown(report) {
     out.push('');
   }
 
+  if (report.notChecked?.length) {
+    out.push(`> **${report.notChecked.length} categories returned no records at all** and were therefore not checked:`);
+    out.push(`> ${report.notChecked.join(', ')}.`);
+    out.push('> ');
+    out.push('> This is not a clean result for those categories. Either the data has not been');
+    out.push('> migrated yet, or this key cannot see it. Resolve which before signing anything off.');
+    out.push('');
+  }
+
   out.push('## Summary');
   out.push('');
   out.push(mdTable(
-    ['Category', 'Scanned', 'Flagged', 'Critical', 'Review', 'Info'],
-    report.summary.map((s) => [s.category, s.scanned, s.flagged, s.critical, s.review, s.info]),
+    ['Category', 'Scanned', 'Critical', 'Review', 'Info', 'Whole-dataset'],
+    report.summary.map((s) => [
+      s.category, s.empty ? '0 — NOT CHECKED' : s.scanned.toLocaleString(),
+      s.empty ? '—' : s.critical.toLocaleString(), s.empty ? '—' : s.review.toLocaleString(),
+      s.empty ? '—' : s.info.toLocaleString(), s.empty ? '—' : (s.systemic || ''),
+    ]),
   ));
   out.push('');
+  out.push('Critical, Review and Info count records you can work through. The last column');
+  out.push('counts findings that apply to most or all of the category — those are listed');
+  out.push('below as characteristics, because they describe the migration rather than');
+  out.push('pick out exceptions within it.');
+  out.push('');
+
+  if (report.characteristics?.length) {
+    out.push('## Characteristics of this dataset');
+    out.push('');
+    out.push('Each of these is true of most or all of its category. They are usually one');
+    out.push('decision each, not a list to work through — but they are the most consequential');
+    out.push('things in this report, because they say what the migration did not carry.');
+    out.push('');
+    out.push(mdTable(
+      ['Category', 'Finding', 'Records', 'Share'],
+      report.characteristics.map((c) => [c.category, c.title, c.count.toLocaleString(), `${c.share}%`]),
+    ));
+    out.push('');
+  }
 
   for (const section of report.sections) {
     out.push(`## ${section.label}`);
     out.push('');
+    if (section.empty) {
+      out.push('**No records returned. Nothing was checked.** Treat this as an open question,');
+      out.push('not as a pass.');
+      out.push('');
+      continue;
+    }
     out.push('### Tally');
     out.push('');
     for (const item of section.tally) {
@@ -91,13 +147,15 @@ export function renderMarkdown(report) {
       out.push('### Investigate');
       out.push('');
       for (const sev of SEVERITIES) {
-        const group = section.findings.filter((f) => f.severity === sev);
+        const group = section.findings.filter((f) => f.severity === sev && !f.systemic);
         if (!group.length) continue;
         out.push(`#### ${sev[0].toUpperCase()}${sev.slice(1)}`);
         out.push('');
         for (const finding of group) {
-          const count = finding.truncatedTo ? `${finding.truncatedTo} of ${finding.total}` : finding.total;
-          out.push(`**${finding.title}** — ${count}`);
+          if (finding.systemic) continue; // already covered under Characteristics
+          const count = finding.truncatedTo ? `${finding.truncatedTo} of ${finding.total.toLocaleString()}` : finding.total.toLocaleString();
+          const groups = finding.groupCount ? ` across ${finding.groupCount.toLocaleString()} group${finding.groupCount === 1 ? '' : 's'}` : '';
+          out.push(`**${finding.title}** — ${count}${groups}`);
           if (finding.why) out.push(`*${finding.why}*`);
           out.push('');
           const fieldKeys = [...new Set(finding.rows.flatMap((r) => Object.keys(r.fields)))];
@@ -124,8 +182,27 @@ export function renderMarkdown(report) {
   return out.join('\n');
 }
 
+// report.json carries a capped sample per finding so it stays openable; findings.jsonl
+// carries every flagged record, one per line, so nothing is lost and the file streams.
+// A rule matching 80,000 invoices would otherwise produce a JSON nobody can load.
 export function writeReport(dir, report) {
+  const rows = createWriteStream(join(dir, 'findings.jsonl'));
+  let written = 0;
+  for (const section of report.sections) {
+    for (const finding of section.findings) {
+      for (const row of finding.allRows ?? finding.rows) {
+        rows.write(JSON.stringify({
+          category: section.key, rule: finding.id, severity: finding.severity,
+          title: finding.title, ...row,
+        }) + '\n');
+        written++;
+      }
+      delete finding.allRows; // never serialised into report.json
+    }
+  }
+  rows.end();
+
   writeFileSync(join(dir, 'report.json'), JSON.stringify(report, null, 2));
   writeFileSync(join(dir, 'report.md'), renderMarkdown(report));
-  return { json: join(dir, 'report.json'), md: join(dir, 'report.md') };
+  return { json: join(dir, 'report.json'), md: join(dir, 'report.md'), rows: join(dir, 'findings.jsonl'), rowCount: written };
 }

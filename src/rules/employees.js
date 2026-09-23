@@ -9,6 +9,9 @@ export default {
   key: 'employees',
   label: 'Employees',
   linkType: 'employee',
+  // Employees come down with the reference sets, into employees.json, because every
+  // referential rule needs their ids before the big collections are read.
+  fromJson: true,
 
   tally(ctx, rows) {
     return [

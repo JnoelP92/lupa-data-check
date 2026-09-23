@@ -288,14 +288,14 @@ export default {
       id: 'products.duplicate.barcode', severity: 'critical',
       title: 'Two products share a barcode',
       group: true,
-      run: (ctx, rows) => collisions(rows, (p) => (isBlank(p.barcode) ? null : String(p.barcode).trim()))
+      run: (ctx, rows) => collisions(rows, (p) => (isBlank(p.barcode) ? null : lower(p.barcode)))
         .flatMap(([key, group]) => group.map((p) => ({ record: p, display: p.name, groupKey: key, fields: { barcode: p.barcode, category: p.category } }))),
     },
     {
       id: 'products.duplicate.itemCode', severity: 'critical',
       title: 'Two products share an item code',
       group: true,
-      run: (ctx, rows) => collisions(rows, (p) => (isBlank(p.itemCode) ? null : String(p.itemCode).trim()))
+      run: (ctx, rows) => collisions(rows, (p) => (isBlank(p.itemCode) ? null : lower(p.itemCode)))
         .flatMap(([key, group]) => group.map((p) => ({ record: p, display: p.name, groupKey: key, fields: { itemCode: p.itemCode, category: p.category } }))),
     },
     {

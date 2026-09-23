@@ -334,3 +334,51 @@ test('a reference set that came back empty skips its rules instead of flagging e
   assert.ok(skipped, 'must be recorded as skipped');
   assert.match(skipped.reason, /came back empty/);
 });
+
+test('a collection that returned no records is marked not-checked, not clean', () => {
+  const { ctx, sections } = run({ overrides: { reminders: [], bundles: [] } });
+  for (const key of ['reminders', 'bundles']) {
+    assert.equal(section(sections, key).empty, true, `${key} should be marked empty`);
+    assert.equal(section(sections, key).counts.critical, 0);
+  }
+  const report = buildReport(ctx, sections);
+  assert.deepEqual(report.notChecked.sort(), ['Bundles', 'Reminders']);
+
+  const md = renderMarkdown(report);
+  assert.match(md, /returned no records at all/);
+  assert.match(md, /NOT CHECKED/);
+  assert.match(md, /Nothing was checked/);
+  // A populated category must not be tarred with the same brush.
+  assert.equal(section(sections, 'clients').empty, false);
+});
+
+test('a rule matching most of its category is reported as a characteristic, not N findings', () => {
+  // Every client missing an email: a fact about the migration, not 200 things to fix.
+  const clients = Array.from({ length: 200 }, (_, i) => ({
+    id: `s${i}`, numericId: 7000 + i, firstName: 'Sat', lastName: `Client${i}`,
+    email: null, phone: `07700${String(i).padStart(6, '0')}`,
+    address: { line_1: '1 High Street' }, primaryStoreId: '11111111-1111-1111-1111-111111111111',
+    isArchived: false, contacts: [], balance: 0,
+  }));
+  const { ctx, sections } = run({ overrides: { clients } });
+  const f = finding(sections, 'clients', 'clients.email.missing');
+  assert.equal(f.systemic, true);
+  assert.equal(f.total, 200);
+  assert.equal(f.share, 100);
+  assert.equal(f.rows.length, 3, 'a saturated finding carries examples, not a table');
+
+  // It must not inflate the actionable headline.
+  assert.equal(section(sections, 'clients').counts.review, 0);
+
+  const report = buildReport(ctx, sections);
+  assert.ok(report.characteristics.some((c) => c.rule === 'clients.email.missing'));
+  const md = renderMarkdown(report);
+  assert.match(md, /Characteristics of this dataset/);
+});
+
+test('duplicate findings report how many groups collided', () => {
+  const { sections } = run();
+  const f = finding(sections, 'clients', 'clients.duplicate.email');
+  assert.equal(f.groupCount, 1, 'two clients sharing one address is one collision');
+  assert.equal(f.total, 2);
+});
