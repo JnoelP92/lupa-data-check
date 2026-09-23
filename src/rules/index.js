@@ -213,6 +213,7 @@ export function runRules(ctx, { modules = MODULES, only } = {}) {
           id: r.record?.id ?? r.id ?? null,
           display: r.display,
           fields: withStore(r),
+          link: r.link ?? (mod.linkFor && r.record ? mod.linkFor(ctx, r.record) : null),
         })),
         rows: shown.map((r) => ({
           id: r.record?.id ?? r.id ?? null,

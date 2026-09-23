@@ -11,6 +11,20 @@ const KEEP_IDS = new Set(['numericId', 'itemCode', 'barcode', 'invoiceNumber', '
 
 export const looksLikeUuid = (v) => typeof v === 'string' && UUID.test(v.trim());
 
+// The workbook is the document people actually work from: they filter it, sort it,
+// paste ids back into Lupa and tick rows off. It therefore keeps the record id and the
+// link, which the printed report strips. Free clinical text still goes — that is a
+// different concern from identifiers, and nobody needs a vet's notes in a spreadsheet
+// to find the record they belong to.
+export function workbookFields(fields) {
+  const out = {};
+  for (const [k, v] of Object.entries(fields ?? {})) {
+    if (k === 'snippet') continue;
+    out[k] = v;
+  }
+  return out;
+}
+
 export function clientSafeFields(fields) {
   const out = {};
   for (const [k, v] of Object.entries(fields ?? {})) {

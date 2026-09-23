@@ -36,10 +36,12 @@ function safeSheetName(name, taken) {
   return candidate;
 }
 
-function sheetXml({ headers, rows }) {
+// links: [{ row, col, url }] with row/col zero-based over the data rows.
+function sheetXml({ headers, rows, links = [] }) {
   const out = [
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
-    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
+    + ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">',
     `<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`,
     '<sheetData>',
   ];
@@ -54,7 +56,13 @@ function sheetXml({ headers, rows }) {
   };
   out.push(row(headers, 1, ' s="1"'));
   rows.forEach((r, i) => out.push(row(r, i + 2, '')));
-  out.push('</sheetData></worksheet>');
+  out.push('</sheetData>');
+  if (links.length) {
+    out.push('<hyperlinks>');
+    links.forEach((l, i) => out.push(`<hyperlink ref="${cellRef(l.col, l.row + 2)}" r:id="rId${i + 1}"/>`));
+    out.push('</hyperlinks>');
+  }
+  out.push('</worksheet>');
   return out.join('');
 }
 
@@ -110,7 +118,17 @@ export function writeXlsx(path, sheets) {
       + '<cellXfs count="2"><xf xfId="0"/><xf xfId="0" fontId="1" applyFont="1"/></cellXfs>'
       + '</styleSheet>');
 
-    named.forEach((s, i) => writeFileSync(join(dir, 'xl', 'worksheets', `sheet${i + 1}.xml`), sheetXml(s)));
+    named.forEach((s, i) => {
+      writeFileSync(join(dir, 'xl', 'worksheets', `sheet${i + 1}.xml`), sheetXml(s));
+      const links = s.links ?? [];
+      if (!links.length) return;
+      mkdirSync(join(dir, 'xl', 'worksheets', '_rels'), { recursive: true });
+      writeFileSync(join(dir, 'xl', 'worksheets', '_rels', `sheet${i + 1}.xml.rels`),
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        + links.map((l, j) => `<Relationship Id="rId${j + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${esc(l.url)}" TargetMode="External"/>`).join('')
+        + '</Relationships>');
+    });
 
     const r = spawnSync('zip', ['-qr', '-X', path, '.'], { cwd: dir, encoding: 'utf8' });
     if (r.status !== 0) throw new Error(r.stderr?.trim() || 'zip failed building the workbook');

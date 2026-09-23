@@ -120,3 +120,40 @@ test('Linear tickets are only produced for findings explicitly marked for one', 
   assert.match(tickets[0].description, /clients\.duplicate\.email/);
   assert.ok(tickets[0].labels.includes('critical'));
 });
+
+test('the workbook carries record ids and clickable links', async () => {
+  const { buildWorkbook } = await import('../src/deliverables.js');
+  const { buildContext, runRules } = await import('../src/rules/index.js');
+  const { writeReport } = await import('../src/report.js');
+  const { makePull } = await import('./fixture.js');
+  const { readFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { execFileSync } = await import('node:child_process');
+
+  const dir = makePull();
+  const ctx = buildContext(dir, { now: new Date('2026-09-20T12:00:00Z') });
+  const built = buildReport(ctx, runRules(ctx));
+  writeReport(dir, built);                   // writes findings.jsonl, which the workbook reads
+  const wb = await buildWorkbook(dir, JSON.parse(readFileSync(join(dir, 'report.json'), 'utf8')));
+  assert.ok(wb, 'a workbook should be produced');
+
+  const names = execFileSync('unzip', ['-l', join(dir, 'findings.xlsx')], { encoding: 'utf8' });
+  assert.match(names, /xl\/worksheets\/_rels\/sheet\d+\.xml\.rels/, 'hyperlink rels part is present');
+
+  const sheet1 = execFileSync('unzip', ['-p', join(dir, 'findings.xlsx'), 'xl/worksheets/sheet1.xml'], { encoding: 'utf8' });
+  assert.match(sheet1, /<hyperlinks>/, 'sheet declares hyperlinks');
+  assert.match(sheet1, />ID</, 'first column is the record id');
+  assert.match(sheet1, />Open in Lupa</, 'last column is the link');
+
+  const rels = execFileSync('unzip', ['-p', join(dir, 'findings.xlsx'), 'xl/worksheets/_rels/sheet1.xml.rels'], { encoding: 'utf8' });
+  assert.match(rels, /work\.lupapets\.com/);
+  assert.match(rels, /TargetMode="External"/);
+});
+
+test('a settings-scoped row always carries something to search for', async () => {
+  const { link } = await import('../src/links.js');
+  // Empty strings are not absent values to `??`, and this API returns them freely.
+  assert.equal(link('product', { itemCode: '', barcode: '  ', name: 'Vettrol Vettest' }).search, 'Vettrol Vettest');
+  assert.equal(link('product', { itemCode: 'IC-1', name: 'Other' }).search, 'IC-1');
+  assert.equal(link('service', { name: '' }).search, undefined);
+});

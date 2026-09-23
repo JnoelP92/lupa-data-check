@@ -5,7 +5,7 @@
 // The client-facing PDF is deliberately not produced here: section 5 requires
 // judgement (softened language, Info stripped, internal config rules removed) and that
 // pass happens in the skill, after the deployment team has reviewed the internal one.
-import { writeFileSync, createWriteStream } from 'node:fs';
+import { writeFileSync, openSync, writeSync, closeSync } from 'node:fs';
 import { join } from 'node:path';
 import { SEVERITIES } from './rules/index.js';
 import { link } from './links.js';
@@ -190,21 +190,31 @@ export function renderMarkdown(report) {
 // carries every flagged record, one per line, so nothing is lost and the file streams.
 // A rule matching 80,000 invoices would otherwise produce a JSON nobody can load.
 export function writeReport(dir, report) {
-  const rows = createWriteStream(join(dir, 'findings.jsonl'));
+  // Written synchronously, in batches. A createWriteStream here returns before the file
+  // is flushed, so anything reading findings.jsonl in the same process — the workbook
+  // builder — found it empty or truncated. Batching keeps it fast without ever holding
+  // 780,000 lines in one string.
+  const fd = openSync(join(dir, 'findings.jsonl'), 'w');
+  let buffer = '';
   let written = 0;
+  const flush = (force) => {
+    if (buffer.length > (force ? 0 : 1 << 20)) { writeSync(fd, buffer); buffer = ''; }
+  };
   for (const section of report.sections) {
     for (const finding of section.findings) {
       for (const row of finding.allRows ?? finding.rows) {
-        rows.write(JSON.stringify({
+        buffer += JSON.stringify({
           category: section.key, rule: finding.id, severity: finding.severity,
-          title: finding.title, ...row,
-        }) + '\n');
+          title: finding.title, linkType: finding.linkType ?? section.linkType ?? null, ...row,
+        }) + '\n';
         written++;
+        flush(false);
       }
       delete finding.allRows; // never serialised into report.json
     }
   }
-  rows.end();
+  flush(true);
+  closeSync(fd);
 
   writeFileSync(join(dir, 'report.json'), JSON.stringify(report, null, 2));
   writeFileSync(join(dir, 'report.md'), renderMarkdown(report));

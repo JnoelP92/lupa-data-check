@@ -6,6 +6,11 @@
 // a `search` hint alongside the URL, which the renderer prints in the row.
 const BASE = 'https://work.lupapets.com';
 
+// `??` only catches null and undefined, and this API returns empty strings freely — a
+// product with itemCode "" fell through to no search hint at all, which on a settings
+// page means no way to find the row.
+const firstUseful = (...values) => values.find((v) => v !== null && v !== undefined && String(v).trim() !== '');
+
 export const LINKS = {
   client: (r) => ({ url: `${BASE}/clients/${r.id}` }),
   pet: (r) => ({ url: `${BASE}/pets/${r.id}` }),
@@ -19,11 +24,11 @@ export const LINKS = {
   clinicalNote: (r) => ({ url: r.petId ? `${BASE}/pets/${r.petId}` : null, note: 'Notes tab' }),
 
   // Settings-scoped: no deep link at all. `search` is what the row must show.
-  product: (r) => ({ url: `${BASE}/settings?tab=products`, search: r.itemCode ?? r.barcode ?? r.name }),
-  service: (r) => ({ url: `${BASE}/settings?tab=services`, search: r.name }),
-  bundle: (r) => ({ url: `${BASE}/settings?tab=bundles`, search: r.name }),
-  employee: (r) => ({ url: `${BASE}/settings?tab=employees`, search: r.email ?? r.firstName }),
-  reminder: (r) => ({ url: `${BASE}/reminders`, search: r.name }),
+  product: (r) => ({ url: `${BASE}/settings?tab=products`, search: firstUseful(r.itemCode, r.barcode, r.name) }),
+  service: (r) => ({ url: `${BASE}/settings?tab=services`, search: firstUseful(r.name) }),
+  bundle: (r) => ({ url: `${BASE}/settings?tab=bundles`, search: firstUseful(r.name) }),
+  employee: (r) => ({ url: `${BASE}/settings?tab=employees`, search: firstUseful(r.email, r.firstName) }),
+  reminder: (r) => ({ url: `${BASE}/reminders`, search: firstUseful(r.name) }),
 };
 
 export function link(type, record) {

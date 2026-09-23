@@ -8,8 +8,8 @@ import { writeFileSync, existsSync, createReadStream } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { join } from 'node:path';
 import { writeXlsx } from './xlsx.js';
-import { clientSafeFields } from './redact.js';
-import { clientSafeSections, clientSafeCharacteristics } from './redact.js';
+import { clientSafeSections, clientSafeCharacteristics, workbookFields } from './redact.js';
+import { link as resolveLink } from './links.js';
 
 // Plain text for the data findings box on the Dock migration page. No tables, no links,
 // no UUIDs — that box renders none of them.
@@ -158,17 +158,26 @@ export async function buildWorkbook(dir, report, { verdicts } = {}) {
   const index = new Map();
   for (const [ruleId, entry] of wanted) {
     if (!entry.rows.length) continue;
-    const keys = [...new Set(entry.rows.flatMap((r) => Object.keys(clientSafeFields(r.fields))))];
+    const keys = [...new Set(entry.rows.flatMap((r) => Object.keys(workbookFields(r.fields))))];
     const name = `${entry.category}: ${entry.title}`.replace(/\.$/, '');
-    sheets.push({
-      name,
-      headers: ['Name', ...keys],
-      rows: entry.rows.map((r) => {
-        const f = clientSafeFields(r.fields);
-        return [r.display, ...keys.map((k) => f[k] ?? '')];
-      }),
+
+    // ID first, so the sheet has a stable key to sort by and paste back into Lupa; the
+    // link last, as a real hyperlink rather than text, so a row opens in one click.
+    const headers = ['ID', 'Name', ...keys, 'Open in Lupa'];
+    const linkCol = headers.length - 1;
+    const links = [];
+    const rows = entry.rows.map((r, i) => {
+      const f = workbookFields(r.fields);
+      // The display name is the last resort for a settings page with nothing else
+      // to search on.
+      const l = r.link ?? resolveLink(r.linkType, { id: r.id, name: r.display, ...r.fields });
+      if (l?.url) links.push({ row: i, col: linkCol, url: l.url });
+      const label = l?.url ? (l.search ? `Open — search "${l.search}"` : 'Open in Lupa') : '';
+      return [r.id ?? '', r.display, ...keys.map((k) => f[k] ?? ''), label];
     });
-    index.set(ruleId, { name: name.slice(0, 31), rows: entry.rows.length, total: entry.total });
+
+    sheets.push({ name, headers, rows, links });
+    index.set(ruleId, { name: name.slice(0, 31), rows: rows.length, total: entry.total });
   }
   if (!sheets.length) return null;
 
