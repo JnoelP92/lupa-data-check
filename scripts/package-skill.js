@@ -10,8 +10,8 @@
 // in the session, so `check` and `deliverables` run straight from the bundle with
 // nothing cloned and nothing installed. Only `pull` needs to happen elsewhere, because
 // only `pull` needs to reach Lupa.
-import { mkdirSync, rmSync, cpSync, existsSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { mkdirSync, rmSync, cpSync, existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { writeZip } from '../src/zip.js';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -36,14 +36,20 @@ for (const skill of SKILLS) {
     if (existsSync(from)) cpSync(from, join(dir, item), { recursive: true });
   }
 
-  // `zip -r` from the stage directory, so the skill folder is the archive root.
-  const out = join(DIST, `${skill}.zip`);
-  const r = spawnSync('zip', ['-qr', out, skill, '-x', '*/.DS_Store'], { cwd: STAGE, encoding: 'utf8' });
-  if (r.status !== 0) {
-    console.error(r.stderr || 'zip failed — is the `zip` command available?');
-    process.exit(1);
-  }
-  console.log(`dist/${skill}.zip`);
+  // The skill folder is the archive root, which the uploader requires.
+  const entries = [];
+  const walk = (abs, rel) => {
+    for (const name of readdirSync(abs)) {
+      if (name === '.DS_Store') continue;
+      const child = join(abs, name);
+      const relPath = `${rel}/${name}`;
+      if (statSync(child).isDirectory()) walk(child, relPath);
+      else entries.push({ name: relPath, data: readFileSync(child) });
+    }
+  };
+  walk(dir, skill);
+  writeZip(join(DIST, `${skill}.zip`), entries);
+  console.log(`dist/${skill}.zip  (${entries.length} files)`);
 }
 
 rmSync(STAGE, { recursive: true, force: true });

@@ -157,3 +157,23 @@ test('a settings-scoped row always carries something to search for', async () =>
   assert.equal(link('product', { itemCode: 'IC-1', name: 'Other' }).search, 'IC-1');
   assert.equal(link('service', { name: '' }).search, undefined);
 });
+
+test('archives are built in-process, so Windows can produce them too', async () => {
+  const { writeZip } = await import('../src/zip.js');
+  const { mkdtempSync, readFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { execFileSync } = await import('node:child_process');
+
+  const dir = mkdtempSync(join(tmpdir(), 'zip-'));
+  const path = join(dir, 'a.zip');
+  writeZip(path, [
+    { name: 'small.txt', data: 'x' },                       // stored: deflate would grow it
+    { name: 'nested/big.xml', data: '<a>b</a>'.repeat(500) }, // deflated
+  ]);
+  // `unzip -t` verifies CRCs and the central directory, which is what Excel reads.
+  const out = execFileSync('unzip', ['-t', path], { encoding: 'utf8' });
+  assert.match(out, /No errors detected/);
+  assert.equal(execFileSync('unzip', ['-p', path, 'small.txt'], { encoding: 'utf8' }), 'x');
+  assert.ok(readFileSync(path).length > 0);
+});
