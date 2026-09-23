@@ -14,9 +14,22 @@ export function phoneKey(v) {
   return digits.length >= 7 ? digits : null;
 }
 
-export function money(minorUnits, currency = 'GBP') {
-  if (minorUnits === null || minorUnits === undefined) return '—';
-  const n = Number(minorUnits) / 100;
+// The OpenAPI spec says amountDue is "in the store's currency (minor units)". The
+// migrations environment returns 1379.46, and unitPrice values like 2.055625 — decimals
+// that cannot be minor units, on a field typed `number` rather than `integer`. Trusting
+// the documentation made every money figure in the report 100x too small.
+//
+// So the scale is detected from the data at the start of a run, and set here once.
+// Module-level state, deliberately: the alternative is threading a scale argument
+// through every one of the ~120 money() call sites in the rules.
+let DIVISOR = 100;
+
+export function setMoneyScale(divisor) { DIVISOR = divisor; }
+export function moneyScale() { return DIVISOR; }
+
+export function money(value, currency = 'GBP') {
+  if (value === null || value === undefined) return '—';
+  const n = Number(value) / DIVISOR;
   try {
     return new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(n);
   } catch {
@@ -26,7 +39,9 @@ export function money(minorUnits, currency = 'GBP') {
 
 export const plural = (n, word, suffix = 's') => `${n} ${word}${n === 1 ? '' : suffix}`;
 
-export const parseMoneyString = (v) => (isBlank(v) ? null : Math.round(Number(v) * 100));
+// Credit note amounts arrive as strings like "12.47" — always major units, whatever
+// the numeric fields are doing. Bring them onto the same scale as everything else.
+export const parseMoneyString = (v) => (isBlank(v) ? null : Number(v) * DIVISOR);
 
 export function groupBy(rows, keyFn) {
   const out = new Map();

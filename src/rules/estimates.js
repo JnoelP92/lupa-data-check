@@ -51,7 +51,7 @@ export default {
       id: 'estimates.total.mismatch', severity: 'critical',
       title: 'Estimate total does not match the sum of its lines',
       truncate: 25,
-      run: (ctx, rows) => rows.filter((e) => Math.abs(expectedTotal(e) - Number(e.amountDue ?? 0)) > 1).map((e) => ({
+      run: (ctx, rows) => rows.filter((e) => Math.abs(expectedTotal(e) - Number(e.amountDue ?? 0)) > ctx.moneyTolerance).map((e) => ({
         record: e, display: label(e),
         fields: { client: e.clientId, amountDue: money(e.amountDue, ctx.currency), expected: money(expectedTotal(e), ctx.currency) },
       })),

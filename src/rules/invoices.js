@@ -78,7 +78,7 @@ export default {
       clientFacing: 'Invoice total does not match what is on it.',
       why: 'Tolerance is one minor unit for rounding. Validate the formula against known-good invoices before acting on a large count here.',
       truncate: 50,
-      run: (ctx, rows) => rows.filter((i) => Math.abs(expectedTotal(i) - Number(i.amountDue ?? 0)) > 1).map((i) => ({
+      run: (ctx, rows) => rows.filter((i) => Math.abs(expectedTotal(i) - Number(i.amountDue ?? 0)) > ctx.moneyTolerance).map((i) => ({
         record: i, display: label(i),
         fields: {
           client: ctx.ix.clientName.get(i.clientId)?.numericId ?? i.clientId,

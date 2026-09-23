@@ -18,6 +18,7 @@ export function buildReport(ctx, sections) {
     company: ctx.meta.company,
     stores: ctx.meta.stores,
     pull: { startedAt: ctx.meta.startedAt, finishedAt: ctx.meta.finishedAt, requests: ctx.meta.requestCount },
+    money: ctx.money ?? null,
     unavailable: ctx.meta.unavailable ?? {},
     notChecked: sections.filter((s) => s.empty).map((s) => s.label),
     characteristics: sections.flatMap((s) => s.findings.filter((f) => f.systemic).map((f) => ({
@@ -62,6 +63,9 @@ export function renderMarkdown(report) {
   out.push('');
   out.push(`**Environment:** ${report.environment}  ·  **Ruleset:** v${report.rulesetVersion}  ·  **Generated:** ${report.generatedAt.slice(0, 16).replace('T', ' ')}`);
   out.push(`**Stores:** ${report.stores.map((s) => s.name).join(', ')}`);
+  if (report.money) {
+    out.push(`**Money:** read as ${report.money.units} units — ${report.money.reason}`);
+  }
   out.push('');
 
   if (Object.keys(report.unavailable).length) {

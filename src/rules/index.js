@@ -16,6 +16,8 @@
 //     state the true total, so a section stays readable without misleading anyone.
 import { Store } from '../store.js';
 import { buildIndexes } from '../indexes.js';
+import { detectMoneyScale } from '../money.js';
+import { setMoneyScale } from '../util.js';
 
 import clients from './clients.js';
 import pets from './pets.js';
@@ -111,6 +113,12 @@ export function buildContext(dir, { now = new Date(), log = () => {} } = {}) {
     referenceLists: ctx.referenceListIds.size,
     stockLocations: ctx.stockLocationIds.size,
   };
+
+  // Before any rule runs, and before any money is formatted.
+  ctx.money = meta.moneyScale ?? detectMoneyScale(store);
+  setMoneyScale(ctx.money.divisor);
+  ctx.moneyTolerance = ctx.money.tolerance;
+  log(`  money: ${ctx.money.units} units — ${ctx.money.reason}`);
 
   ctx.ix = buildIndexes(store, { log });
   ctx.referenceSizes.employees = ctx.ix.employeeIds.size;

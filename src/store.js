@@ -88,6 +88,16 @@ export class Store {
     return [...this.read(key)];
   }
 
+  // First N records of a collection, without reading the whole file.
+  sample(key, n = 500) {
+    const out = [];
+    for (const row of this.read(key)) {
+      out.push(row);
+      if (out.length >= n) break;
+    }
+    return out;
+  }
+
   count(key) {
     return this.readCheckpoint(key)?.lines ?? 0;
   }

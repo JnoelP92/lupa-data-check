@@ -12,6 +12,7 @@ import { isBlank, lower, money, parseMoneyString, parseDate } from '../util.js';
 
 // expected = completed invoices − completed payments − issued non-refundable credit
 function reconcileClients(ctx) {
+  const tolerance = ctx.moneyTolerance ?? 1;
   const invoiced = new Map(), paid = new Map(), credited = new Map();
   const add = (m, k, v) => m.set(k, (m.get(k) ?? 0) + v);
 
@@ -33,7 +34,7 @@ function reconcileClients(ctx) {
     totals.paid += paid.get(clientId) ?? 0;
     totals.credited += credited.get(clientId) ?? 0;
     totals.balance += balance;
-    if (Math.abs(expected - balance) > 1) out.push({ clientId, expected, balance, delta: balance - expected });
+    if (Math.abs(expected - balance) > tolerance) out.push({ clientId, expected, balance, delta: balance - expected });
   }
   return { mismatches: out, totals };
 }
@@ -84,7 +85,8 @@ export default {
         const { totals } = reconcileClients(ctx);
         const expected = totals.invoiced - totals.paid - totals.credited;
         const delta = totals.balance - expected;
-        if (Math.abs(delta) <= 100) return [];
+        // A hundred tolerance-units: real rounding drift, not a broken ledger.
+        if (Math.abs(delta) <= (ctx.moneyTolerance ?? 1) * 100) return [];
         return [{
           id: 'top-level',
           display: 'Whole practice',

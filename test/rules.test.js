@@ -392,3 +392,24 @@ test('cross-record rules measure their share against what they actually scanned'
   const pets = cross.findings.find((f) => f.id === 'cross.pets.noHistory');
   assert.ok(pets.share <= 100 && pets.share > 0, 'pet rule measured against the pet count');
 });
+
+test('money scale is detected from the data, not taken from the spec', async () => {
+  const { detectMoneyScale } = await import('../src/money.js');
+  const { Store } = await import('../src/store.js');
+
+  // The fixture is integer minor units, as the spec documents.
+  const minor = detectMoneyScale(new Store(makePull()));
+  assert.equal(minor.units, 'minor');
+  assert.equal(minor.divisor, 100);
+
+  // A practice returning decimals cannot be on minor units, whatever the spec says.
+  const decimals = makePull({ overrides: { invoices: [
+    { id: 'd1', invoiceNumber: 'D1', clientId: 'c0001', status: 'completed', amountDue: 1379.46, amountPaid: 0,
+      activeFrom: '2026-06-01T10:00:00Z', billingProducts: [{ id: 'l1', price: 32.89, unitPrice: 2.055625, quantity: 16 }], billingServices: [], billingBundles: [] },
+  ] } });
+  const major = detectMoneyScale(new Store(decimals));
+  assert.equal(major.units, 'major');
+  assert.equal(major.divisor, 1);
+  assert.equal(major.tolerance, 0.01);
+  assert.match(major.reason, /non-integer/);
+});
