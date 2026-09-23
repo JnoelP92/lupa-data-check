@@ -15,6 +15,7 @@ export default {
   key: 'appointments',
   label: 'Appointments',
   linkType: 'appointment',
+  storeFrom: (a) => a.storeId,
 
   tally(ctx, rows) {
     const cancelled = rows.filter((a) => lower(a.status) === 'cancelled').length;
@@ -176,7 +177,8 @@ export default {
       group: true,
       run: (ctx, rows) => collisions(rows.filter((a) => a.petId && a.start), (a) => `${a.petId}|${a.start}`)
         .flatMap(([key, group]) => group.map((a) => ({
-          record: a, display: title(a), groupKey: key, fields: { start: a.start, status: a.status },
+          record: a, display: title(a), groupKey: key,
+          fields: { pet: ctx.ix.petName.get(a.petId) ?? a.petId, start: a.start, status: a.status },
         }))),
     },
     {
@@ -187,7 +189,8 @@ export default {
         rows.filter((a) => a.petId && a.start && a.visitTypeId && lower(a.status) !== 'cancelled'),
         (a) => `${a.petId}|${String(a.start).slice(0, 10)}|${a.visitTypeId}`,
       ).flatMap(([key, group]) => group.map((a) => ({
-        record: a, display: title(a), groupKey: key, fields: { start: a.start, status: a.status },
+        record: a, display: title(a), groupKey: key,
+        fields: { pet: ctx.ix.petName.get(a.petId) ?? a.petId, start: a.start, status: a.status },
       }))),
     },
     {

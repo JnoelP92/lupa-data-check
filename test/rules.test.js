@@ -135,7 +135,7 @@ const EXPECTED = {
   invoices: {
     'invoices.payment.overAllocated': ['in04'], 'invoices.payment.paidButUnderpaid': ['in05'],
     'invoices.payment.unpaidButPaid': ['in06'], 'invoices.payment.partialButFull': ['in07'],
-    'invoices.status.emptyCompleted': ['in08'], 'invoices.status.chargeWithoutLines': ['in09'],
+    'invoices.status.chargeWithoutLines': ['in09'],
     'invoices.status.staleDraft': ['in10'], 'invoices.status.draftWithPayment': ['in11'],
     'invoices.line.negative': ['in12'], 'invoices.line.zeroQuantity': ['in13'],
     'invoices.line.discountExceedsLine': ['in15'], 'invoices.line.discountOver100': ['in16'],
@@ -412,4 +412,20 @@ test('money scale is detected from the data, not taken from the spec', async () 
   assert.equal(major.divisor, 1);
   assert.equal(major.tolerance, 0.01);
   assert.match(major.reason, /non-integer/);
+});
+
+test('a zero-priced line that was discounted to zero is not a missing price', () => {
+  const line = (over) => ({ id: 'l1', productId: 'pr01', name: 'Product pr01', price: 0, unitPrice: 0, quantity: 1, vatPercentage: 20, discountType: '£', ...over });
+  const inv = (id, l) => ({
+    id, invoiceNumber: id, clientId: 'c0001', petId: 'p01', storeId: '11111111-1111-1111-1111-111111111111',
+    status: 'completed', paymentStatus: 'unpaid', amountDue: 0, amountPaid: 0,
+    activeFrom: '2026-06-01T10:00:00Z', discountAmount: 0, discountType: '£',
+    createdByEmployeeId: 'e01', billingProducts: [l], billingServices: [], billingBundles: [],
+  });
+  const { sections } = run({ overrides: { invoices: [
+    inv('free1', line({ discount: 0 })),      // no price, no discount — flag it
+    inv('disc1', line({ discount: 2000 })),   // deliberately given away — do not
+  ] } });
+  const f = finding(sections, 'invoices', 'invoices.line.freeButCatalogued');
+  assert.deepEqual((f?.rows ?? []).map((r) => r.id), ['free1']);
 });

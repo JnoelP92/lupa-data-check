@@ -7,6 +7,7 @@ export default {
   key: 'refunds',
   label: 'Refunds',
   linkType: null,
+  storeFrom: (r) => r.storeId,
 
   tally(ctx, rows) {
     const completed = rows.filter((r) => lower(r.status) === 'completed');

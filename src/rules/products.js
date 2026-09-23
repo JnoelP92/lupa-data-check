@@ -30,6 +30,7 @@ export default {
   key: 'products',
   label: 'Products',
   linkType: 'product',
+  storeFrom: (p) => p.storeId,
 
   tally(ctx, rows) {
     const withFee = rows.filter((p) => Number(p.dispensingFee ?? 0) > 0);

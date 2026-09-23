@@ -24,6 +24,7 @@ export default {
   key: 'clients',
   label: 'Clients',
   linkType: 'client',
+  storeFrom: (c) => c.primaryStoreId,
 
   tally(ctx, rows) {
     const storeNames = ctx.storeNames;

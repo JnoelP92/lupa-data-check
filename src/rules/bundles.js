@@ -10,6 +10,7 @@ export default {
   key: 'bundles',
   label: 'Bundles',
   linkType: 'bundle',
+  storeFrom: (b) => b.storeId,
 
   tally(ctx, rows) {
     return [

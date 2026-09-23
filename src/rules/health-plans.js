@@ -8,6 +8,7 @@ export default {
   key: 'healthPlans',
   label: 'Health plans',
   linkType: 'healthPlan',
+  storeFrom: (p) => p.storeId,
 
   tally(ctx, rows) {
     const allowances = rows.flatMap((p) => p.allowances ?? []);

@@ -69,9 +69,11 @@ test('the client report keeps the reconciliation totals and every Lupa link', ()
 
 test('the client report has contents links and a way back to the summary', () => {
   const html = renderClientReport(report());
-  assert.match(html, /<nav class="toc">/);
+  assert.match(html, /Record by record/);
   assert.match(html, /href="#clients"/);
   assert.match(html, /Back to summary/);
+  // Summary and contents sit side by side in one row, so navigation needs no scrolling.
+  assert.match(html, /class="nav-row"/);
   assert.match(html, /Fixture Veterinary Group/);
 });
 

@@ -32,6 +32,7 @@ export default {
   key: 'estimates',
   label: 'Estimates',
   linkType: 'invoice',
+  storeFrom: (e) => e.storeId,
 
   tally(ctx, rows) {
     const stale = unconverted(ctx, rows).filter((e) => {

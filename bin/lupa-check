@@ -30,7 +30,7 @@ import { ENVIRONMENTS } from '../src/collections.js';
 import { buildContext, runRules } from '../src/rules/index.js';
 import { buildReport, writeReport } from '../src/report.js';
 import { writeClientReport } from '../src/client-report.js';
-import { writeDeliverables } from '../src/deliverables.js';
+import { writeDeliverables, buildWorkbook } from '../src/deliverables.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -192,9 +192,12 @@ try {
         senderName: typeof args.from === 'string' ? args.from : undefined,
         team: typeof args.team === 'string' ? args.team : undefined,
       };
-      const html = writeClientReport(dir, report, opts);
+      // Built first: the client report cites its sheet names.
+      const workbook = await buildWorkbook(dir, report, opts);
+      const html = writeClientReport(dir, report, { ...opts, workbook });
       const rest = writeDeliverables(dir, report, opts);
-      console.error(`\nWrote:\n  ${html}\n  ${rest.dock}\n  ${rest.email}${rest.linear ? `\n  ${rest.linear}` : ''}`);
+      console.error(`\nWrote:\n  ${html}\n  ${rest.dock}\n  ${rest.email}${rest.linear ? `\n  ${rest.linear}` : ''}`
+        + (workbook ? `\n  ${workbook.path} (${workbook.sheets} sheets, ${workbook.rows.toLocaleString()} rows)` : ''));
       console.error('\nPrint report-client.html to PDF for the client-facing copy.');
       break;
     }

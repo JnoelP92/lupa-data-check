@@ -48,6 +48,41 @@ export default {
 
   tally(ctx) {
     const { totals } = reconcileClients(ctx);
+
+    // Money per store, then the total. A multi-site practice cannot act on a single
+    // combined figure — the branches are run separately and reconcile separately.
+    const byStore = new Map();
+    const bump = (id, key, value) => {
+      if (!byStore.has(id)) byStore.set(id, { invoices: 0, invoiced: 0, collected: 0, outstanding: 0, payments: 0, paid: 0 });
+      byStore.get(id)[key] += value;
+    };
+    for (const i of ctx.store.read('invoices')) {
+      if (lower(i.status) !== 'completed') continue;
+      const id = i.storeId ?? '(no store)';
+      bump(id, 'invoices', 1);
+      bump(id, 'invoiced', Number(i.amountDue ?? 0));
+      bump(id, 'collected', Number(i.amountPaid ?? 0));
+      bump(id, 'outstanding', Number(i.amountDue ?? 0) - Number(i.amountPaid ?? 0));
+    }
+    for (const p of ctx.store.read('payments')) {
+      if (lower(p.status) !== 'completed') continue;
+      const id = p.storeId ?? '(no store)';
+      bump(id, 'payments', 1);
+      bump(id, 'paid', Number(p.amount ?? 0));
+    }
+
+    const rows = [...byStore.entries()].map(([id, v]) => ({
+      key: id, label: ctx.storeNames.get(id) ?? id, count: v.invoices,
+      extra: `${money(v.invoiced, ctx.currency)} invoiced · ${money(v.collected, ctx.currency)} collected · ${money(v.outstanding, ctx.currency)} outstanding · ${money(v.paid, ctx.currency)} in payment records`,
+    })).sort((a, b) => b.count - a.count);
+    const sum = (k) => [...byStore.values()].reduce((t, v) => t + v[k], 0);
+    if (rows.length > 1) {
+      rows.push({
+        key: '(total)', label: 'ALL STORES', count: sum('invoices'),
+        extra: `${money(sum('invoiced'), ctx.currency)} invoiced · ${money(sum('collected'), ctx.currency)} collected · ${money(sum('outstanding'), ctx.currency)} outstanding · ${money(sum('paid'), ctx.currency)} in payment records`,
+      });
+    }
+
     const topDebtors = [...ctx.ix.clientBalance.entries()]
       .filter(([, b]) => b > 0)
       .sort((a, b) => b[1] - a[1])
@@ -62,9 +97,14 @@ export default {
     const petsWithoutAppointments = [...ctx.ix.petIds].filter((p) => !ctx.ix.appointmentsByPet.has(p)).length;
     const petsWithoutInvoices = [...ctx.ix.petIds].filter((p) => !ctx.ix.invoicedPets.has(p)).length;
 
+    // The gap the invoice and payment ledgers disagree about.
+    const unbacked = sum('collected') - sum('paid');
+
     return [
+      { label: 'Invoices and payments, by store', breakdown: rows },
       { label: 'Total invoiced (completed)', value: money(totals.invoiced, ctx.currency) },
-      { label: 'Total collected (completed)', value: money(totals.paid, ctx.currency) },
+      { label: 'Total in payment records (completed)', value: money(totals.paid, ctx.currency) },
+      { label: 'Marked paid on invoices with no payment record', value: money(unbacked, ctx.currency) },
       { label: 'Total credited (issued, non-refundable)', value: money(totals.credited, ctx.currency) },
       { label: 'Expected total balance', value: money(totals.invoiced - totals.paid - totals.credited, ctx.currency) },
       { label: 'Actual total of client balances', value: money(totals.balance, ctx.currency) },

@@ -22,6 +22,7 @@ export default {
   key: 'services',
   label: 'Services',
   linkType: 'service',
+  storeFrom: (s) => s.storeId,
 
   tally(ctx, rows) {
     const withMargin = rows.filter((s) => marginOf(s) !== null);

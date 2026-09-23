@@ -13,6 +13,7 @@ export default {
   key: 'creditNotes',
   label: 'Credit notes',
   linkType: null,
+  storeFrom: (c) => c.storeId,
 
   tally(ctx, rows) {
     const issued = rows.filter((c) => lower(c.status) === 'issued');

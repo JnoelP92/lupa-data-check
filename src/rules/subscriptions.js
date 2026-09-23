@@ -10,6 +10,7 @@ export default {
   key: 'healthPlanSubscriptions',
   label: 'Health plan subscriptions',
   linkType: 'healthPlan',
+  storeFrom: (s) => s.storeId,
 
   tally(ctx, rows) {
     return [

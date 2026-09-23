@@ -8,6 +8,7 @@ export default {
   key: 'payments',
   label: 'Payments',
   linkType: null,
+  storeFrom: (p) => p.storeId,
 
   tally(ctx, rows) {
     const byMethod = new Map();

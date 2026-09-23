@@ -4,8 +4,11 @@
 // None of these send anything. The email is a draft for a human to read, edit and send;
 // the Linear export is a file the skill turns into issues only after the user has
 // picked which findings deserve one.
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, existsSync, createReadStream } from 'node:fs';
+import { createInterface } from 'node:readline';
 import { join } from 'node:path';
+import { writeXlsx } from './xlsx.js';
+import { clientSafeFields } from './redact.js';
 import { clientSafeSections, clientSafeCharacteristics } from './redact.js';
 
 // Plain text for the data findings box on the Dock migration page. No tables, no links,
@@ -115,6 +118,62 @@ export function renderLinearTickets(report, { verdicts, team } = {}) {
     }
   }
   return selected;
+}
+
+// Categories where the practice needs the whole list rather than a sample: a catalogue
+// is something you sit down and work through, one row at a time.
+const EXPORT_EVERYTHING = new Set(['products', 'services', 'bundles']);
+const SHEET_CAP = 100;
+
+// The workbook is built from findings.jsonl rather than report.json, because report.json
+// only carries a capped sample per rule. The full set is on disk already; this reads it
+// once, keeping only the rules that made it into the client report.
+export async function buildWorkbook(dir, report, { verdicts } = {}) {
+  const path = join(dir, 'findings.jsonl');
+  const sections = clientSafeSections(report.sections, { verdicts }).filter((s) => s.findings.length);
+
+  const wanted = new Map(); // ruleId -> { finding, section, cap, rows }
+  for (const section of sections) {
+    for (const finding of section.findings) {
+      wanted.set(finding.id, {
+        title: finding.title, category: section.label, total: finding.total,
+        cap: EXPORT_EVERYTHING.has(section.key) ? Infinity : SHEET_CAP,
+        rows: [],
+      });
+    }
+  }
+  if (!wanted.size || !existsSync(path)) return null;
+
+  const reader = createInterface({ input: createReadStream(path), crlfDelay: Infinity });
+  for await (const line of reader) {
+    if (!line) continue;
+    let row;
+    try { row = JSON.parse(line); } catch { continue; }
+    const entry = wanted.get(row.rule);
+    if (!entry || entry.rows.length >= entry.cap) continue;
+    entry.rows.push(row);
+  }
+
+  const sheets = [];
+  const index = new Map();
+  for (const [ruleId, entry] of wanted) {
+    if (!entry.rows.length) continue;
+    const keys = [...new Set(entry.rows.flatMap((r) => Object.keys(clientSafeFields(r.fields))))];
+    const name = `${entry.category}: ${entry.title}`.replace(/\.$/, '');
+    sheets.push({
+      name,
+      headers: ['Name', ...keys],
+      rows: entry.rows.map((r) => {
+        const f = clientSafeFields(r.fields);
+        return [r.display, ...keys.map((k) => f[k] ?? '')];
+      }),
+    });
+    index.set(ruleId, { name: name.slice(0, 31), rows: entry.rows.length, total: entry.total });
+  }
+  if (!sheets.length) return null;
+
+  const written = writeXlsx(join(dir, 'findings.xlsx'), sheets);
+  return { ...written, sheetFor: (ruleId) => index.get(ruleId) };
 }
 
 export function writeDeliverables(dir, report, opts = {}) {

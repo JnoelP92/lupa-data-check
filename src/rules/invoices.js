@@ -31,6 +31,7 @@ export default {
   key: 'invoices',
   label: 'Invoices',
   linkType: 'invoice',
+  storeFrom: (i) => i.storeId,
 
   tally(ctx, rows) {
     const due = rows.reduce((t, i) => t + Number(i.amountDue ?? 0), 0);
@@ -133,13 +134,6 @@ export default {
       })),
     },
     {
-      id: 'invoices.status.emptyCompleted', severity: 'review',
-      title: 'Completed invoice with no lines and nothing to pay',
-      run: (ctx, rows) => rows.filter((i) => completed(i) && Number(i.amountDue ?? 0) === 0 && !lines(i).length).map((i) => ({
-        record: i, display: label(i), fields: { client: i.clientId, date: i.activeFrom },
-      })),
-    },
-    {
       id: 'invoices.status.chargeWithoutLines', severity: 'critical',
       title: 'Completed invoice with a value but nothing on it',
       clientFacing: 'Invoice has a total but no items listed.',
@@ -185,10 +179,11 @@ export default {
       id: 'invoices.line.freeButCatalogued', severity: 'review',
       title: 'Line charged at zero where the catalogue price is not zero',
       truncate: 25,
+      why: 'Only counted where the line carries no discount — a discounted line priced to zero is a deliberate giveaway, not a missing price.',
       run: (ctx, rows) => rows.flatMap((i) => [
-        ...(i.billingProducts ?? []).filter((l) => Number(l.unitPrice ?? 0) === 0 && (ctx.ix.productPrice.get(l.productId) ?? 0) > 0)
+        ...(i.billingProducts ?? []).filter((l) => Number(l.unitPrice ?? 0) === 0 && Number(l.discount ?? 0) === 0 && (ctx.ix.productPrice.get(l.productId) ?? 0) > 0)
           .map((l) => ({ record: i, display: label(i), fields: { line: l.name, catalogue: money(ctx.ix.productPrice.get(l.productId), ctx.currency) } })),
-        ...(i.billingServices ?? []).filter((l) => Number(l.unitPrice ?? 0) === 0 && (ctx.ix.servicePrice.get(l.serviceId) ?? 0) > 0)
+        ...(i.billingServices ?? []).filter((l) => Number(l.unitPrice ?? 0) === 0 && Number(l.discount ?? 0) === 0 && (ctx.ix.servicePrice.get(l.serviceId) ?? 0) > 0)
           .map((l) => ({ record: i, display: label(i), fields: { line: l.name, catalogue: money(ctx.ix.servicePrice.get(l.serviceId), ctx.currency) } })),
       ]),
     },

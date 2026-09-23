@@ -184,6 +184,13 @@ export function runRules(ctx, { modules = MODULES, only } = {}) {
       // there are. 302 products sharing one placeholder code is one problem.
       const groupCount = rule.group ? new Set(hits.map((h) => h.groupKey)).size : null;
 
+      const withStore = (r) => {
+        if (!mod.storeFrom) return r.fields ?? {};
+        const id = mod.storeFrom(r.record ?? {});
+        if (!id) return r.fields ?? {};
+        return { store: ctx.storeNames.get(id) ?? id, ...(r.fields ?? {}) };
+      };
+
       findings.push({
         id: rule.id,
         severity: rule.severity,
@@ -198,11 +205,14 @@ export function runRules(ctx, { modules = MODULES, only } = {}) {
         truncatedTo: hits.length > shown.length ? shown.length : null,
         grouped: Boolean(rule.group),
         linkType: rule.linkType ?? mod.linkType,
-        // Every hit, for findings.jsonl; stripped before report.json is written.
+        // Which store a record belongs to, resolved once here rather than repeated in
+        // every rule's fields. Multi-site practices need it on every row to be readable
+        // at all, and it costs a single-site practice one narrow column.
+        // (applied below via withStore)
         allRows: hits.map((r) => ({
           id: r.record?.id ?? r.id ?? null,
           display: r.display,
-          fields: r.fields ?? {},
+          fields: withStore(r),
         })),
         rows: shown.map((r) => ({
           id: r.record?.id ?? r.id ?? null,
@@ -212,7 +222,7 @@ export function runRules(ctx, { modules = MODULES, only } = {}) {
           // Some records have no URL of their own and must borrow one — a clinical note
           // links to the pet it is filed against. `linkFor` on the module resolves that.
           link: r.link ?? (mod.linkFor && r.record ? mod.linkFor(ctx, r.record) : null),
-          fields: r.fields ?? {},
+          fields: withStore(r),
         })),
       });
     }
