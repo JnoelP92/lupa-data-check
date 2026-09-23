@@ -160,8 +160,16 @@ export function runRules(ctx, { modules = MODULES, only } = {}) {
       if (!hits.length) continue;
 
       const cap = Math.min(rule.truncate ?? MAX_ROWS, MAX_ROWS);
-      const scannedCount = rows.length || 1;
-      const systemic = hits.length >= SATURATION_MIN && hits.length / scannedCount >= SATURATION_SHARE;
+      // What this rule ranged over. Cross-record rules own no collection and each one
+      // scans something different — a pet rule against 72,258 pets, a client rule
+      // against 36,669 clients — so they name it. Without this the denominator falls
+      // back to 1 and every cross-record finding looks like 100% of its category.
+      const scannedCount = rule.scanOf
+        ? (ctx.counts[rule.scanOf] ?? 0)
+        : (rows.length || (mod.collection === null ? (ctx.counts[mod.scannedFrom] ?? 0) : 0));
+      const systemic = scannedCount > 0
+        && hits.length >= SATURATION_MIN
+        && hits.length / scannedCount >= SATURATION_SHARE;
       // A saturated rule needs a handful of examples, not a hundred.
       const shown = hits.slice(0, systemic ? 3 : cap);
       // Duplicate rules list every member; the useful number is how many collisions
@@ -172,7 +180,7 @@ export function runRules(ctx, { modules = MODULES, only } = {}) {
         id: rule.id,
         severity: rule.severity,
         systemic,
-        share: Math.round((hits.length / scannedCount) * 100),
+        share: scannedCount > 0 ? Math.round((hits.length / scannedCount) * 100) : null,
         groupCount,
         title: rule.title,
         clientFacing: rule.clientFacing ?? rule.title,

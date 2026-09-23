@@ -101,6 +101,7 @@ export default {
     },
     {
       id: 'cross.balance.clientMismatch', severity: 'critical',
+      scanOf: 'clients',
       title: 'Client balance does not match their invoices, payments and credits',
       clientFacing: 'Account balance does not match the transactions behind it.',
       why: 'Validate the formula against a few known-clean clients before acting on a large count. Practices vary in whether refundable credit reduces the balance.',
@@ -120,6 +121,7 @@ export default {
     },
     {
       id: 'cross.pets.noHistory', severity: 'info',
+      scanOf: 'pets',
       title: 'Active pet with no appointment and no invoice ever',
       why: 'Either a record that never transacted, or history that did not come across.',
       linkType: 'pet',
@@ -136,6 +138,7 @@ export default {
     },
     {
       id: 'cross.appointments.noCharge', severity: 'review',
+      scanOf: 'appointments',
       title: 'Completed appointment with no charge against it',
       clientFacing: 'Completed appointment with nothing billed.',
       why: 'Legitimate for free re-checks and plan-covered visits. Worth a look at the volume rather than the individual rows.',
@@ -161,6 +164,7 @@ export default {
     },
     {
       id: 'cross.bundles.priceVsComponents', severity: 'review',
+      scanOf: 'bundles',
       title: 'Bundle price does not match the sum of what is inside it',
       clientFacing: 'Bundle price does not match the items it contains.',
       why: 'Derived from invoice instances, since the bundle endpoint does not list members. Only reported where it holds consistently across instances.',
@@ -208,6 +212,7 @@ export default {
     },
     {
       id: 'cross.prescriptions.neverCharged', severity: 'info',
+      scanOf: 'prescriptions',
       title: 'Prescription written but never charged for',
       why: 'May be goodwill, may be a missed charge. Volume matters more than the individual rows.',
       linkType: 'prescription',

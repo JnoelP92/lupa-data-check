@@ -382,3 +382,13 @@ test('duplicate findings report how many groups collided', () => {
   assert.equal(f.groupCount, 1, 'two clients sharing one address is one collision');
   assert.equal(f.total, 2);
 });
+
+test('cross-record rules measure their share against what they actually scanned', () => {
+  const { sections } = run();
+  const cross = section(sections, 'crossRecord');
+  for (const f of cross.findings) {
+    assert.ok(f.share === null || (f.share >= 0 && f.share <= 100), `${f.id} share is ${f.share}%`);
+  }
+  const pets = cross.findings.find((f) => f.id === 'cross.pets.noHistory');
+  assert.ok(pets.share <= 100 && pets.share > 0, 'pet rule measured against the pet count');
+});
