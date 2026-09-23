@@ -44,6 +44,36 @@ The key is stored under its own keychain slot (`lupa-data-check`), not the one
 `api-upload-tool` uses. The two tools default to different environments, and a shared
 slot means one silently running with the other's key.
 
+## Giving it to someone else
+
+Three ways in, depending on how much they want to do.
+
+**Just run the checks, no Claude.** Node 18+ and nothing else:
+
+```bash
+npx github:JnoelP92/lupa-data-check key
+npx github:JnoelP92/lupa-data-check run --env migrations --out ~/lupa-checks/<practice>/out
+```
+
+The repo is public, so this needs no GitHub access and no clone.
+
+**The full workflow in Claude Code.** Clone it and open the folder:
+
+```bash
+git clone https://github.com/JnoelP92/lupa-data-check.git
+```
+
+`.claude/skills/` is committed, so both skills load with no install step, no
+marketplace and no admin. They ask whether it is a data check or a live-config pass,
+then drive the whole thing. Update with `git pull`.
+
+**In Cowork.** `npm run package:skill`, then upload each zip at Settings →
+Capabilities → Skills. See below.
+
+Whichever route, each person needs **their own API key for the practice** — one key per
+store, issued fresh — and stashes it with `lupa-check key`. Keys are per machine and
+never travel with the repo.
+
 ## Installing without an admin
 
 The marketplace route needs admin access to the plugin repo on GitHub, checked through
@@ -130,9 +160,10 @@ redacted sample will do.
 ## Checks
 
 ```bash
-npm test                 # 44 tests, includes the field check
+npm test                 # 55 tests, includes the field and skill-drift checks
 npm run check:fields     # do the rules read fields the API actually returns?
 npm run sync:spec        # refresh spec-fields.json from the live OpenAPI spec
+npm run sync:skills      # after editing a SKILL.md, copy it to .claude/skills/
 ```
 
 `sync-spec.js` reduces Lupa's 1.3MB OpenAPI document to the ~19KB of field names the

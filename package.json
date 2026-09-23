@@ -14,7 +14,8 @@
     "test": "node --test",
     "check:fields": "node scripts/check-fields.js",
     "sync:spec": "node scripts/sync-spec.js",
-    "package:skill": "node scripts/package-skill.js"
+    "package:skill": "node scripts/package-skill.js",
+    "sync:skills": "node scripts/sync-skills.js"
   },
   "license": "UNLICENSED",
   "private": true,

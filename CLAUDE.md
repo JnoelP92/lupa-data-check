@@ -60,10 +60,18 @@ dropped, UUIDs and internal reference fields are stripped, `clientFacing` wordin
 replaces the internal title. Anything new that could leak internal config belongs in
 that file, not in the renderer.
 
+## The skills live in two places
+
+`plugin/skills/` is the source of truth — the layout a marketplace install needs.
+`.claude/skills/` is a committed copy, so the skills load when someone opens this folder
+in Claude Code with no install step. After editing any `SKILL.md`, run
+`npm run sync:skills`; a test fails if the two drift, because a stale copy is invisible
+— Claude Code would load the old instructions and nothing would look wrong.
+
 ## Checks
 
 ```bash
-npm test                 # 44 tests, field check included
+npm test                 # 55 tests, field and skill-drift checks included
 npm run sync:spec        # refresh spec-fields.json when the API moves
 npm run check:fields
 ```
