@@ -38,12 +38,29 @@ export function clientSafeFinding(finding) {
   return { ...finding, title: finding.clientFacing ?? finding.title, rows };
 }
 
+// Whole-dataset findings, in client-facing wording. These are the ones the practice
+// most needs to see and least needs a table for: "no prescription has an expiry date"
+// is one sentence, not 236,515 rows.
+export function clientSafeCharacteristics(sections, { verdicts } = {}) {
+  return sections
+    .filter((s) => s.clientFacing !== false)
+    .flatMap((s) => s.findings
+      .filter((f) => f.systemic && f.severity !== 'info' && !f.internalOnly)
+      .filter((f) => (verdicts ? verdicts[f.id]?.include !== false : true))
+      .map((f) => ({
+        category: s.label, title: f.clientFacing ?? f.title,
+        count: f.total, share: f.share, severity: f.severity,
+      })))
+    .sort((a, b) => (b.share ?? 0) - (a.share ?? 0));
+}
+
 export function clientSafeSections(sections, { verdicts } = {}) {
   return sections
     .filter((s) => s.clientFacing !== false)
     .map((s) => ({
       ...s,
       findings: s.findings
+        .filter((f) => !f.systemic) // covered separately, as characteristics
         .filter((f) => (verdicts ? verdicts[f.id]?.include !== false : true))
         .map(clientSafeFinding)
         .filter(Boolean),

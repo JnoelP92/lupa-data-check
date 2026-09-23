@@ -9,7 +9,7 @@
 // What is different from the internal report is enforced in src/redact.js, not here.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { clientSafeSections } from './redact.js';
+import { clientSafeSections, clientSafeCharacteristics } from './redact.js';
 import { link } from './links.js';
 
 const esc = (v) => String(v ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -86,6 +86,7 @@ function findingHtml(finding, sectionLinkType) {
 
 export function renderClientReport(report, { verdicts, intro } = {}) {
   const sections = clientSafeSections(report.sections, { verdicts }).filter((s) => s.findings.length);
+  const characteristics = clientSafeCharacteristics(report.sections, { verdicts });
 
   // Reconciliation headline numbers, kept per section 5 — these are what the practice
   // most wants back.
@@ -119,7 +120,17 @@ ${(report.notChecked ?? []).length ? `<p class="lede"><strong>What this review d
 ${totals.length ? `<h3>Where the money stands</h3>
 <dl class="totals">${totals.map((t) => `<div><dt>${esc(t.label)}</dt><dd>${esc(t.value)}</dd></div>`).join('')}</dl>` : ''}
 
-<nav class="toc"><strong>What is in this report</strong><ol>${toc}</ol></nav>
+${characteristics.length ? `<section class="cat" id="across-the-board" style="page-break-before:avoid">
+  <h2>Across the whole record set</h2>
+  <p class="lede">Each of these is true of nearly every record of its kind, so they are
+  almost certainly one decision each rather than a list to work through. They are the
+  most important part of this report.</p>
+  <table><thead><tr><th>Area</th><th>What we found</th><th class="num">Records</th><th class="num">Share</th></tr></thead><tbody>
+  ${characteristics.map((c) => `<tr><td>${esc(c.category)}</td><td>${esc(c.title)}</td><td class="num">${c.count.toLocaleString()}</td><td class="num">${c.share}%</td></tr>`).join('')}
+  </tbody></table>
+</section>` : ''}
+
+<nav class="toc"><strong>Then, record by record</strong><ol>${toc}</ol></nav>
 
 ${body}
 

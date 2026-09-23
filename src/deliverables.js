@@ -6,21 +6,35 @@
 // picked which findings deserve one.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { clientSafeSections } from './redact.js';
+import { clientSafeSections, clientSafeCharacteristics } from './redact.js';
 
 // Plain text for the data findings box on the Dock migration page. No tables, no links,
 // no UUIDs — that box renders none of them.
-export function renderDockCopy(report, { verdicts } = {}) {
+export function renderDockCopy(report, opts = {}) {
+  const { verdicts } = opts;
   const sections = clientSafeSections(report.sections, { verdicts }).filter((s) => s.findings.length);
   const out = [];
   out.push(`Data check — ${report.company.name}`);
   out.push(`${report.environment} environment, ${report.generatedAt.slice(0, 10)}, ruleset v${report.rulesetVersion}`);
   out.push('');
 
+  // Counts exclude whole-dataset findings, which are listed separately below. Folding
+  // them in turns "644,707 to review" into a number nobody can act on.
   const totalCritical = sections.reduce((t, s) => t + s.findings.filter((f) => f.severity === 'critical').reduce((a, f) => a + f.total, 0), 0);
   const totalReview = sections.reduce((t, s) => t + s.findings.filter((f) => f.severity === 'review').reduce((a, f) => a + f.total, 0), 0);
-  out.push(`${totalCritical} items to fix before go-live, ${totalReview} to review.`);
+  out.push(`${totalCritical.toLocaleString()} items to fix before go-live, ${totalReview.toLocaleString()} to review.`);
   out.push('');
+
+  const characteristics = clientSafeCharacteristics(report.sections, opts);
+  if (characteristics.length) {
+    out.push('ACROSS THE WHOLE RECORD SET');
+    out.push('These are true of nearly every record of their kind - one decision each,');
+    out.push('not a list to work through.');
+    for (const c of characteristics) {
+      out.push(`  - ${c.title.replace(/\.$/, '')}: ${c.count.toLocaleString()} (${c.share}%)`);
+    }
+    out.push('');
+  }
   if ((report.notChecked ?? []).length) {
     out.push(`NOT CHECKED - no records returned: ${report.notChecked.join(', ')}.`);
     out.push('Not a clean result for these. Confirm whether the data is migrated yet.');
@@ -42,8 +56,12 @@ export function renderDockCopy(report, { verdicts } = {}) {
 // A draft the internal user opens, reads and sends themselves. Never sent from here.
 export function renderEmail(report, { contactName, senderName, verdicts } = {}) {
   const sections = clientSafeSections(report.sections, { verdicts }).filter((s) => s.findings.length);
-  const critical = sections.flatMap((s) => s.findings.filter((f) => f.severity === 'critical'));
-  const headline = critical.slice(0, 3);
+  // Lead with what the migration did not carry; those matter more than any individual
+  // record, and they are what the practice can actually answer questions about.
+  const characteristics = clientSafeCharacteristics(report.sections, { verdicts });
+  const headline = characteristics.length
+    ? characteristics.slice(0, 3).map((c) => ({ title: c.title, total: c.count }))
+    : sections.flatMap((s) => s.findings.filter((f) => f.severity === 'critical')).slice(0, 3);
 
   const subject = `${report.company.name} — data review, first pass`;
   const body = [
