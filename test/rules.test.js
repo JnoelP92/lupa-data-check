@@ -429,3 +429,14 @@ test('a zero-priced line that was discounted to zero is not a missing price', ()
   const f = finding(sections, 'invoices', 'invoices.line.freeButCatalogued');
   assert.deepEqual((f?.rows ?? []).map((r) => r.id), ['free1']);
 });
+
+test('currency and expected tax rates come from the practice, not from the UK', () => {
+  const uk = run();
+  assert.equal(uk.ctx.currency, 'GBP');
+  assert.deepEqual(uk.ctx.vatRates, [0, 5, 20]);
+
+  // A US practice: dollars, and no VAT to expect.
+  const us = run({ meta: { currency: 'USD', storeVatRates: [0, 7.75] } });
+  assert.equal(us.ctx.currency, 'USD');
+  assert.deepEqual(us.ctx.vatRates, [0, 7.75]);
+});

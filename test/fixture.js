@@ -415,7 +415,7 @@ export const INSURANCE_POLICIES = [
 
 const jsonl = (rows) => rows.map((r) => JSON.stringify(r)).join('\n') + '\n';
 
-export function makePull({ overrides = {}, unavailable = {}, now = '2026-09-20' } = {}) {
+export function makePull({ overrides = {}, unavailable = {}, meta = {}, now = '2026-09-20' } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'lupa-check-'));
   mkdirSync(join(dir, '.checkpoint'), { recursive: true });
 
@@ -456,7 +456,7 @@ export function makePull({ overrides = {}, unavailable = {}, now = '2026-09-20' 
     environment: 'migrations',
     company: { id: 'co-1', name: 'Fixture Veterinary Group' },
     stores: [{ id: STORE_A, name: 'Main Surgery' }, { id: STORE_B, name: 'Branch Clinic' }],
-    counts, requestCount: 142, unavailable,
+    counts, requestCount: 142, unavailable, ...meta,
   }));
 
   return dir;

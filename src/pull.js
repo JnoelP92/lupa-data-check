@@ -156,8 +156,16 @@ export async function pull(api, dir, { companyId, only, since, log = console.err
     }
   }
 
+  // The practice's own currency and tax rates, rather than this tool's assumptions.
+  // Seal Beach is in California: everything was about to be printed in pounds.
+  const currencies = [...new Set(stores.map((s) => s.currencyCode).filter(Boolean))];
+  const storeVatRates = [...new Set(stores.map((s) => Number(s.vatPercentage)).filter((v) => Number.isFinite(v)))];
+
   const meta = {
     rulesetVersion: RULESET_VERSION,
+    currency: currencies.length === 1 ? currencies[0] : (currencies[0] ?? 'GBP'),
+    currencies,
+    storeVatRates,
     startedAt,
     finishedAt: new Date().toISOString(),
     baseUrl: api.baseUrl,
@@ -172,6 +180,7 @@ export async function pull(api, dir, { companyId, only, since, log = console.err
     ),
   };
   store.writeJson('meta', meta);
+  if (currencies.length > 1) log(`\n  NOTE: stores report different currencies (${currencies.join(', ')}); totals use ${meta.currency}.`);
   log(`\n${api.requestCount} requests. Written to ${dir}/`);
   return meta;
 }

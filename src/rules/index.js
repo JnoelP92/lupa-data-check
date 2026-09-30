@@ -83,7 +83,13 @@ export function buildContext(dir, { now = new Date(), log = () => {} } = {}) {
     meta,
     now,
     currency: meta.currency ?? 'GBP',
-    vatRates: meta.vatRates ?? [0, 5, 20],
+    // UK rates are only the right expectation for a UK practice. Anywhere else, take
+    // the rates the stores themselves declare — a US clinic charges no VAT at all, and
+    // flagging every line as an unexpected rate would be pure noise.
+    vatRates: meta.vatRates
+      ?? ((meta.currency ?? 'GBP') === 'GBP'
+        ? [0, 5, 20]
+        : [...new Set([0, ...(meta.storeVatRates ?? [])])]),
     unavailable: new Set(Object.keys(meta.unavailable ?? {})),
     counts: meta.counts ?? {},
 
