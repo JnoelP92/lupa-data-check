@@ -31,6 +31,7 @@ export function buildIndexes(store, { log = () => {} } = {}) {
     clientIsArchived: new Set(),
     clientBalance: new Map(),    // clientId -> minor units
     clientName: new Map(),       // clientId -> display name + numericId
+    clientStore: new Map(),      // clientId -> primaryStoreId
     petName: new Map(),
     productPrice: new Map(),
     servicePrice: new Map(),
@@ -51,6 +52,7 @@ export function buildIndexes(store, { log = () => {} } = {}) {
     if (c.isArchived === true) ix.clientIsArchived.add(c.id);
     ix.clientBalance.set(c.id, Number(c.balance ?? 0));
     ix.clientName.set(c.id, { name: [c.firstName, c.lastName].filter(Boolean).join(' ').trim(), numericId: c.numericId });
+    if (c.primaryStoreId) ix.clientStore.set(c.id, c.primaryStoreId);
   }
   for (const p of store.read('pets')) {
     ix.petIds.add(p.id);

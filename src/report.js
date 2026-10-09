@@ -72,7 +72,7 @@ export function renderMarkdown(report) {
   out.push('');
 
   if (Object.keys(report.unavailable).length) {
-    out.push('> **Incomplete pull.** These reference sets were not readable with this key, so the rules that depend on them were skipped rather than passed:');
+    out.push('> **Incomplete pull.** These reference sets were not readable with this key, so the rules that depend on them were **not checked** — not passed:');
     for (const [k, v] of Object.entries(report.unavailable)) out.push(`> - \`${k}\` — ${v.split('\n')[0]}`);
     out.push('');
   }
@@ -168,7 +168,7 @@ export function renderMarkdown(report) {
           const fieldKeys = [...new Set(finding.rows.flatMap((r) => Object.keys(r.fields)))];
           const headers = ['Name', ...fieldKeys, ...(finding.grouped ? ['Shared with'] : []), 'Open in Lupa'];
           out.push(mdTable(headers, finding.rows.map((r) => {
-            const l = r.link ?? link(finding.linkType ?? section.linkType, { id: r.id, ...r.fields });
+            const l = r.link ?? link(finding.linkType ?? section.linkType, { id: r.id, ...r.fields }, report.environment);
             const open = l.url ? `[Open ↗](${l.url})${l.search ? ` — search \`${l.search}\`` : ''}` : '—';
             return [r.display, ...fieldKeys.map((k) => r.fields[k]), ...(finding.grouped ? [r.reason ?? ''] : []), open];
           })));
@@ -179,7 +179,9 @@ export function renderMarkdown(report) {
     }
 
     if (section.skipped.length) {
-      out.push('### Skipped');
+      out.push('### Not checked');
+      out.push('');
+      out.push('_These rules did not run. They found nothing because they looked at nothing — not because the data is clean._');
       out.push('');
       for (const s of section.skipped) out.push(`- **${s.title}** — ${s.reason}`);
       out.push('');

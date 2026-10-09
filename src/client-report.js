@@ -89,12 +89,12 @@ footer { margin-top: 48px; border-top: 1px solid var(--line); padding-top: 14px;
 // How many rows a client-facing table shows before handing off to the spreadsheet.
 const HTML_ROWS = 10;
 
-function findingHtml(finding, sectionLinkType, workbook) {
+function findingHtml(finding, sectionLinkType, workbook, environment) {
   const rows = finding.rows.slice(0, HTML_ROWS);
   const keys = [...new Set(rows.flatMap((r) => Object.keys(r.fields)))];
   const head = ['', ...keys, 'Open in Lupa'];
   const body = rows.map((r) => {
-    const l = r.link ?? link(finding.linkType ?? sectionLinkType, { id: r.id, ...r.fields });
+    const l = r.link ?? link(finding.linkType ?? sectionLinkType, { id: r.id, ...r.fields }, environment);
     const open = l?.url
       ? `<a href="${esc(l.url)}">Open &#8599;</a>${l.search ? ` <span class="count">search “${esc(l.search)}”</span>` : ''}`
       : '—';
@@ -145,7 +145,7 @@ export function renderClientReport(report, { verdicts, intro, workbook } = {}) {
   <div class="cat-head"><h2>${esc(s.label)}</h2>
     <span class="n">${s.scanned.toLocaleString()} records checked · ${s.findings.length} thing${s.findings.length === 1 ? '' : 's'} to look at</span></div>
   <div class="cat-body">
-    <div class="findings">${s.findings.map((f) => findingHtml(f, s.linkType, workbook)).join('\n')}</div>
+    <div class="findings">${s.findings.map((f) => findingHtml(f, s.linkType, workbook, report.environment)).join('\n')}</div>
     <p class="note"><a class="back" href="#top">↑ Back to summary</a></p>
   </div>
 </section>`).join('\n');

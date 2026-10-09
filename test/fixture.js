@@ -46,6 +46,18 @@ export const CLIENTS = [
   client(18, { contacts: [{ firstName: 'No', lastName: 'Route', email: null, phone: null, relationshipType: 'spouse' }] }),
   client(19, { isArchived: true, email: null, phone: null }),
   client(20, { primaryStoreId: STORE_B }),
+  // One person registered at both sites: same name, same email. Not a duplicate.
+  client(21, { firstName: 'Mia', lastName: 'Cross', email: 'mia@example.com', dob: '1979-03-03' }),
+  client(22, { firstName: 'Mia', lastName: 'Cross', email: 'mia@example.com', dob: '1979-03-03', primaryStoreId: STORE_B }),
+  // An archived record sharing an email with a live one is the old half, not a duplicate.
+  client(23, { email: 'old@example.com', isArchived: true }),
+  client(24, { email: 'old@example.com' }),
+  // The same number written nationally and internationally.
+  client(25, { phone: '07700 900123' }),
+  client(26, { phone: '+44 7700 900123' }),
+  // Same name and email but both at one site: still a duplicate.
+  client(27, { firstName: 'Sam', lastName: 'Dupe', email: 'sam@example.com', dob: '1990-01-01' }),
+  client(28, { firstName: 'Sam', lastName: 'Dupe', email: 'sam@example.com', dob: '1991-01-01' }),
 ];
 
 const pet = (id, over = {}) => ({
@@ -75,6 +87,14 @@ export const PETS = [
   pet('p17', { name: 'Rex', dob: '2020-01-01', clientsPets: [{ clientId: 'c0002', isArchived: false }] }),
   pet('p18', { name: 'Rex', dob: '2020-01-01', clientsPets: [{ clientId: 'c0002', isArchived: false }] }),
   pet('p19', { deceased: true, deceasedDate: '2024-03-01' }),
+  // One pet registered at both sites under the same owner name. Not a shared chip.
+  pet('p20', { name: 'Luna', microchip: '985 141 000 123 456', clientsPets: [{ clientId: 'c0021', isArchived: false }] }),
+  pet('p21', { name: 'Luna', microchip: '985141000123456', clientsPets: [{ clientId: 'c0022', isArchived: false }] }),
+  // Two different pets, one chip written with spaces.
+  pet('p22', { microchip: '985 141 000 999 888' }),
+  pet('p23', { microchip: '985141000999888' }),
+  // A deceased pet sharing p01's chip is an old record, not a second animal.
+  pet('p24', { deceased: true, deceasedDate: '2023-05-05', microchip: '900123456789001' }),
 ];
 
 export const EMPLOYEES = [

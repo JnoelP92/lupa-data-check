@@ -4,7 +4,7 @@
 // payment-terms reference sets. The balance-vs-transaction-history reconciliation
 // (6.11.6) needs invoices, payments and credit notes, so it lives in the financials
 // module and is cross-referenced from the client section at render time.
-import { isBlank, lower, phoneKey, breakdown, collisions, money, parseDate, plural } from '../util.js';
+import { isBlank, lower, phoneKey, breakdown, collisions, sameAcrossSites, mergeGroups, money, parseDate, plural } from '../util.js';
 
 // The API's own email pattern. A value that fails this was accepted by an import path
 // that did not validate, so it will fail again the first time comms are sent.
@@ -19,6 +19,23 @@ const PLACEHOLDER_PHONE = [
 
 const fullName = (c) => [c.firstName, c.lastName].filter(Boolean).join(' ').trim() || '(no name)';
 const live = (c) => c.isArchived === false;
+
+// Duplicate matching. Archived clients are left out: an archived record is usually the
+// old half of a duplicate someone already dealt with, and listing it as a Critical
+// duplicate of the live one sends the practice to fix something that is fixed.
+//
+// And one person at several sites is not a duplicate — see sameAcrossSites. Those
+// groups are taken out of the duplicate rules and listed by clients.multiSite instead,
+// so they stay visible without being reported as a defect.
+const notArchived = (c) => c.isArchived !== true;
+const nameKey = (c) => lower([c.firstName, c.lastName].filter(Boolean).join(' ').replace(/\s+/g, ' ')) || null;
+const DUPLICATE_KEYS = {
+  email: (c) => lower(c.email),
+  phone: (c) => phoneKey(c.phone),
+  nameDob: (c) => (isBlank(c.dob) || !nameKey(c) ? null : `${nameKey(c)}|${c.dob}`),
+};
+const oneClientManySites = (group) => sameAcrossSites(group, nameKey, (c) => c.primaryStoreId);
+const duplicates = (rows, key) => collisions(rows.filter(notArchived), key).filter(([, g]) => !oneClientManySites(g));
 
 export default {
   key: 'clients',
@@ -136,7 +153,7 @@ export default {
       title: 'Two or more clients share an email address',
       why: 'Comms go to the wrong household, and merging after go-live is manual.',
       group: true,
-      run: (ctx, rows) => collisions(rows, (c) => lower(c.email)).flatMap(([key, group]) =>
+      run: (ctx, rows) => duplicates(rows, DUPLICATE_KEYS.email).flatMap(([key, group]) =>
         group.map((c) => ({
           record: c,
           display: fullName(c),
@@ -152,7 +169,7 @@ export default {
       title: 'Two or more clients share a phone number',
       why: 'Often a real duplicate record, but households legitimately share a landline — needs a look.',
       group: true,
-      run: (ctx, rows) => collisions(rows, (c) => phoneKey(c.phone)).flatMap(([key, group]) =>
+      run: (ctx, rows) => duplicates(rows, DUPLICATE_KEYS.phone).flatMap(([key, group]) =>
         group.map((c) => ({
           record: c,
           display: fullName(c),
@@ -167,10 +184,7 @@ export default {
       severity: 'review',
       title: 'Two or more clients share name and date of birth',
       group: true,
-      run: (ctx, rows) => collisions(
-        rows.filter((c) => !isBlank(c.dob)),
-        (c) => `${lower(c.firstName)}|${lower(c.lastName)}|${c.dob}`,
-      ).flatMap(([key, group]) =>
+      run: (ctx, rows) => duplicates(rows, DUPLICATE_KEYS.nameDob).flatMap(([key, group]) =>
         group.map((c) => ({
           record: c,
           display: fullName(c),
@@ -178,6 +192,30 @@ export default {
           fields: { numericId: c.numericId, dob: c.dob, email: c.email, phone: c.phone },
         })),
       ),
+    },
+    {
+      id: 'clients.multiSite',
+      severity: 'info',
+      title: 'Same client registered at more than one site',
+      why: 'Same name and the same email, phone or date of birth, with one record per site. Expected for a multi-site practice, so not reported as a duplicate — listed so it can be confirmed.',
+      group: true,
+      run: (ctx, rows) => {
+        const active = rows.filter(notArchived);
+        const byId = new Map(active.map((c) => [c.id, c]));
+        const groups = Object.values(DUPLICATE_KEYS).flatMap((key) =>
+          collisions(active, key).filter(([, g]) => oneClientManySites(g)).map(([, g]) => g.map((c) => c.id)));
+        return mergeGroups(groups).flatMap((ids) => {
+          const group = ids.map((id) => byId.get(id));
+          const siteName = (c) => ctx.storeNames.get(c.primaryStoreId) ?? c.primaryStoreId;
+          return group.map((c) => ({
+            record: c,
+            display: fullName(c),
+            groupKey: [...ids].sort().join('|'),
+            fields: { numericId: c.numericId, email: c.email, phone: c.phone, store: siteName(c) },
+            reason: `Also at ${group.filter((o) => o !== c).map(siteName).join(', ')}`,
+          }));
+        });
+      },
     },
     {
       id: 'clients.balance.nonZero',

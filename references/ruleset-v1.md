@@ -13,7 +13,7 @@ Severity means:
 
 ## Implementation status
 
-230 rules across 20 modules, validated against the OpenAPI spec of 2026-09-21.
+231 rules across 20 modules, validated against the OpenAPI spec of 2026-09-21.
 
 `spec-fields.json` records the fields each resource actually returns, and
 `npm run check:fields` fails the build if a rule reads one that is not there. That check
@@ -23,8 +23,8 @@ and found the data clean. It caught 19 such references on its first run.
 
 | Category | Module | Rules | Notes |
 |---|---|---|---|
-| 6.1 Clients | `clients.js` | 13 | Balance reconciliation lives in cross-record |
-| 6.2 Pets | `pets.js` | 16 | |
+| 6.1 Clients | `clients.js` | 14 | Balance reconciliation lives in cross-record |
+| 6.2 Pets | `pets.js` | 16 | Shared-chip matching: live pets only, spaces ignored, one pet across sites listed apart |
 | 6.3 Appointments | `appointments.js` | 19 | `roomId` rule dropped — no endpoint, see Open questions |
 | 6.4 Products | `products.js` | 31 | Batch expiry deferred — needs a per-record detail GET |
 | 6.5 Services | `services.js` | 10 | Thin resource — four spec rules dropped, see below |
@@ -119,13 +119,24 @@ additional contacts and the average per client.
 | `clients.phone.implausible` | Review | under 7 digits, all one digit, or a known placeholder range |
 | `clients.dob.implausible` | Review | `dob` in the future or before 1900 |
 | `clients.address.missing` | Info | `address.line_1` null and not archived |
-| `clients.duplicate.email` | Critical | 2+ clients share an email, lowercased and trimmed |
-| `clients.duplicate.phone` | Critical | 2+ clients share a phone, digits only, 7+ digits |
-| `clients.duplicate.nameDob` | Review | 2+ clients share first + last + dob, dob not null |
+| `clients.duplicate.email` | Critical | 2+ non-archived clients share an email, lowercased and trimmed |
+| `clients.duplicate.phone` | Critical | 2+ non-archived clients share a phone, normalised to national format (`+44 7700…` = `07700…`), 7+ digits |
+| `clients.duplicate.nameDob` | Review | 2+ non-archived clients share first + last + dob, dob not null |
+| `clients.multiSite` | Info | a group from the three rules above where every record has the same name and each is at a different site — one person, one record per site |
 | `clients.balance.nonZero` | Info | `balance != 0`, top 10 by absolute value |
 | `clients.ref.primaryStore` | Critical | `primaryStoreId` not in `/v1/companies/stores` |
 | `clients.ref.paymentTerms` | Critical | `paymentTermsId` not in `/v1/payment-terms` |
 | `clients.contacts.noRoute` | Info | a `contacts[]` entry with neither email nor phone |
+
+### Duplicates across sites
+
+A multi-site practice gives a client a record at each site they use, so the same email,
+phone or chip appears once per site by design. A duplicate group where every record has
+the same name and no two are at the same site is taken out of the duplicate rules and
+listed under `clients.multiSite` (or `pets.multiSite`, matched on pet name + owner name
++ the owner's site). Two names in one group, or two records at one site, stays a
+duplicate. Archived clients and deceased or archived pets are left out of duplicate
+matching altogether.
 
 ### Client-facing wording
 

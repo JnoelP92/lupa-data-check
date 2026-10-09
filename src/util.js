@@ -6,12 +6,38 @@ export const isBlank = (v) => v === null || v === undefined || (typeof v === 'st
 
 export const lower = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : null);
 
-// Phone comparison key. Anything under 7 digits is too short to be a real number and
-// too likely to collide, so it is excluded from duplicate matching entirely.
+// Phone comparison key. "07700 900123", "+44 7700 900123", "0044 (0)7700 900123" and
+// "447700900123" are one number written four ways; comparing raw digits missed every
+// one of those pairs. So international forms are brought back to the national one
+// before comparing. Only codes whose national form is "0 + the rest" are rewritten
+// this way, plus North America, which has no leading 0 at all.
+//
+// Anything under 7 digits is too short to be a real number and too likely to collide,
+// so it is excluded from duplicate matching entirely.
+const TRUNK_ZERO = ['44', '353', '61', '64']; // UK, Ireland, Australia, New Zealand
 export function phoneKey(v) {
   if (typeof v !== 'string') return null;
-  const digits = v.replace(/\D/g, '');
+  const international = /^\s*(\+|00)/.test(v);
+  let digits = v.replace(/\D/g, '');
+  if (international && digits.startsWith('00')) digits = digits.slice(2);
+  const code = TRUNK_ZERO.find((c) => digits.startsWith(c));
+  // A UK national number is 11 digits starting 0, so 12 digits starting 44 can only be
+  // the international form with the + dropped.
+  if (code && (international || (code === '44' && digits.length === 12))) {
+    digits = `0${digits.slice(code.length).replace(/^0/, '')}`;
+  } else if (international && digits.startsWith('1') && digits.length === 11) {
+    digits = digits.slice(1);
+  }
   return digits.length >= 7 ? digits : null;
+}
+
+// Microchip comparison key. "985 141 000 123 456" and "985141000123456" are the same
+// chip; spaces, dashes and dots are how people type it, not part of it. Upper-cased
+// because older 10-character chips carry hex letters.
+export function microchipKey(v) {
+  if (isBlank(v)) return null;
+  const key = String(v).replace(/[\s.\-]/g, '').toUpperCase();
+  return key || null;
 }
 
 // The OpenAPI spec says amountDue is "in the store's currency (minor units)". The
@@ -70,6 +96,39 @@ export function collisions(rows, keyFn) {
     buckets.get(k).push(row);
   }
   return [...buckets.entries()].filter(([, group]) => group.length > 1);
+}
+
+// One person registered at several sites is not a duplicate. A multi-site practice
+// gives a client a record at each site they use, so the same email, phone or chip turns
+// up once per site by design. A collision group is that case when every member has the
+// same name and no two are at the same site; anything else — two names, or two records
+// at one site — is still a duplicate and stays in the duplicate rule.
+export function sameAcrossSites(group, nameOf, siteOf) {
+  const names = new Set(group.map(nameOf));
+  const sites = group.map(siteOf);
+  return names.size === 1 && !isBlank([...names][0])
+    && sites.every((s) => !isBlank(s)) && new Set(sites).size === sites.length;
+}
+
+// Merge overlapping groups of ids, so one person matched by email and again by phone is
+// listed once. Returns arrays of ids.
+export function mergeGroups(groups) {
+  const parent = new Map();
+  const find = (x) => {
+    while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); }
+    return x;
+  };
+  for (const g of groups) {
+    for (const id of g) if (!parent.has(id)) parent.set(id, id);
+    for (const id of g.slice(1)) parent.set(find(id), find(g[0]));
+  }
+  const out = new Map();
+  for (const id of parent.keys()) {
+    const root = find(id);
+    if (!out.has(root)) out.set(root, []);
+    out.get(root).push(id);
+  }
+  return [...out.values()];
 }
 
 export const daysAgo = (n, now = Date.now()) => new Date(now - n * 86_400_000);

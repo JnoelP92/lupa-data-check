@@ -1,5 +1,6 @@
 // Section 6.10 — Prescriptions.
 import { isBlank, lower, breakdown, parseDate, daysAgo } from '../util.js';
+import { workBase } from '../links.js';
 
 const label = (p) => p.productName ?? '(no product)';
 const dispenses = (p) => (p.prescriptionDispenses ?? []).filter((d) => d.isCancelled !== true);
@@ -14,7 +15,7 @@ export default {
   // tab. Resolved here so the link survives redaction, which strips raw ids.
   linkFor(ctx, rx) {
     if (!rx.petId || !ctx.ix.petIds.has(rx.petId)) return { url: null };
-    return { url: `https://work.lupapets.com/pets/${rx.petId}`, note: 'Medical Highlights tab' };
+    return { url: `${workBase(ctx.meta.environment)}/pets/${rx.petId}`, note: 'Medical Highlights tab' };
   },
 
   tally(ctx, rows) {

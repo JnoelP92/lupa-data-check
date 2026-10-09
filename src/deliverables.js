@@ -170,7 +170,7 @@ export async function buildWorkbook(dir, report, { verdicts } = {}) {
       const f = workbookFields(r.fields);
       // The display name is the last resort for a settings page with nothing else
       // to search on.
-      const l = r.link ?? resolveLink(r.linkType, { id: r.id, name: r.display, ...r.fields });
+      const l = r.link ?? resolveLink(r.linkType, { id: r.id, name: r.display, ...r.fields }, report.environment);
       if (l?.url) links.push({ row: i, col: linkCol, url: l.url });
       const label = l?.url ? (l.search ? `Open — search "${l.search}"` : 'Open in Lupa') : '';
       return [r.id ?? '', r.display, ...keys.map((k) => f[k] ?? ''), label];

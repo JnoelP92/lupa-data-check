@@ -185,7 +185,7 @@ leaks.
 
 ## Status
 
-All 20 rule modules are implemented — 230 rules covering every category in the spec.
+All 20 rule modules are implemented — 231 rules covering every category in the spec.
 Where the API differs from the spec document, `references/ruleset-v1.md` says so and
 names each rule that had to change or go, rather than leaving code that quietly matches
 nothing.

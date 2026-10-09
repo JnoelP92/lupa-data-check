@@ -95,13 +95,34 @@ If they have Claude Code on the same Mac, that is the better handoff than a raw
 terminal: it runs as an ordinary process with no proxy in front of it, so it can do the
 pull and hand back the folder.
 
+## Only report what is in the data
+
+The check can only report what is actually in the pulled data. This applies to
+everything you say about a practice — in chat, in the verdicts, and in any wording you
+add to a deliverable:
+
+- **Every finding names or links the record.** Each one comes from a rule and carries a
+  record name, ID and "Open in Lupa" link. If you cannot point to the record, do not
+  state the finding.
+- **No numbers or findings the rules did not produce.** Counts come from `report.md`,
+  `report.json` or `findings.jsonl`, never from an estimate, an extrapolation or what
+  "usually" happens at practices like this one. Do not add a finding by reading the data
+  yourself; if a check is missing, say so and suggest adding a rule.
+- **Anything that could not be checked is "not checked".** Skipped rules, categories that
+  returned no records, and reference sets that failed to load are listed as *not
+  checked* in the report. Say exactly that. Never describe them as passed, clean, fine or
+  probably fine, and never fill the gap with a guess.
+- **When unsure, say what the data shows and stop.** "12 clients share an email address"
+  is a fact from the data; "these are probably the same family" is a guess — leave it to
+  the practice.
+
 ## Reading the report
 
 `out/report.md` is the internal artefact. Work through it with the user in this order:
 
 1. **The summary table.** Scanned vs flagged per category, then Critical counts.
-2. **Anything in "Incomplete pull"** at the top. A reference set that failed to load
-   means rules were *skipped*, not passed. Resolve this before reading anything else —
+2. **Anything in "Incomplete pull"** at the top, and every **Not checked** list. A
+   reference set that failed to load means rules were *not checked*, not passed. Resolve this before reading anything else —
    a skipped rule reads like a clean one.
 3. **Critical findings, category by category.** For each, the question is not "is this
    in the report" but "is this actually wrong, or is it how this practice works". Both
@@ -168,7 +189,7 @@ than reporting a pass.
 
 ## What the ruleset covers
 
-All 20 modules, 230 rules — `references/ruleset-v1.md` is the source of truth, and it
+All 20 modules, 231 rules — `references/ruleset-v1.md` is the source of truth, and it
 names every place the API differs from the original spec document and what changed as a
 result. Several rules the document asked for do not exist because the fields do not.
 When someone asks why a check they expected is missing, that file has the answer.

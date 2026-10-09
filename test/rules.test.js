@@ -27,7 +27,9 @@ const EXPECTED = {
     'clients.email.missing': ['c0002'], 'clients.phone.missing': ['c0003'],
     'clients.email.malformed': ['c0004'], 'clients.phone.implausible': ['c0005'],
     'clients.dob.implausible': ['c0006'], 'clients.address.missing': ['c0007'],
-    'clients.duplicate.email': ['c0008', 'c0009'], 'clients.duplicate.phone': ['c0010', 'c0011'],
+    'clients.duplicate.email': ['c0008', 'c0009', 'c0027', 'c0028'],
+    'clients.duplicate.phone': ['c0010', 'c0011', 'c0025', 'c0026'],
+    'clients.multiSite': ['c0021', 'c0022'],
     'clients.duplicate.nameDob': ['c0012', 'c0013'], 'clients.ref.primaryStore': ['c0016'],
     'clients.ref.paymentTerms': ['c0017'], 'clients.contacts.noRoute': ['c0018'],
   },
@@ -37,7 +39,8 @@ const EXPECTED = {
     'pets.microchip.malformed': ['p07'], 'pets.deceased.noDate': ['p08'],
     'pets.deceased.dateWithoutFlag': ['p09'], 'pets.neutered.noDate': ['p10'],
     'pets.weights.none': ['p11'], 'pets.owner.none': ['p12'], 'pets.owner.allArchived': ['p13'],
-    'pets.owner.dangling': ['p14'], 'pets.duplicate.microchip': ['p15', 'p16'],
+    'pets.owner.dangling': ['p14'], 'pets.duplicate.microchip': ['p15', 'p16', 'p22', 'p23'],
+    'pets.multiSite': ['p20', 'p21'],
     'pets.duplicate.sameOwner': ['p17', 'p18'],
   },
   appointments: {
@@ -211,8 +214,11 @@ test('archived clients are exempt from missing-contact rules', () => {
 
 test('duplicate matching normalises case, whitespace and phone formatting', () => {
   const { sections } = run();
-  assert.deepEqual(ids(sections, 'clients', 'clients.duplicate.email'), ['c0008', 'c0009']);
-  assert.deepEqual(ids(sections, 'clients', 'clients.duplicate.phone'), ['c0010', 'c0011']);
+  assert.deepEqual(ids(sections, 'clients', 'clients.duplicate.email'), ['c0008', 'c0009', 'c0027', 'c0028']);
+  // 07700 900123 and +44 7700 900123 are one number.
+  assert.deepEqual(ids(sections, 'clients', 'clients.duplicate.phone'), ['c0010', 'c0011', 'c0025', 'c0026']);
+  // "985 141 000 999 888" and "985141000999888" are one chip.
+  assert.ok(ids(sections, 'pets', 'pets.duplicate.microchip').includes('p22'));
   assert.deepEqual(ids(sections, 'products', 'products.duplicate.name'), ['pr31', 'pr32']);
   assert.deepEqual(ids(sections, 'services', 'services.duplicate.name'), ['sv11', 'sv12']);
 });
@@ -316,8 +322,8 @@ test('markdown renders links, tables and the incomplete-pull warning', () => {
   const { ctx, sections } = run();
   const md = renderMarkdown(buildReport(ctx, sections));
   assert.match(md, /# Data check — Fixture Veterinary Group/);
-  assert.match(md, /https:\/\/work\.lupapets\.com\/clients\/c0004/);
-  assert.match(md, /https:\/\/work\.lupapets\.com\/settings\?tab=products/);
+  assert.match(md, /https:\/\/work\.migrations\.lupapets\.com\/clients\/c0004/);
+  assert.match(md, /https:\/\/work\.migrations\.lupapets\.com\/settings\?tab=products/);
   assert.doesNotMatch(md, /\| *\| *\|\n\|-+\|\n$/);
 
   const warned = run({ unavailable: { paymentTerms: 'HTTP 403 forbidden' } });
@@ -379,8 +385,36 @@ test('a rule matching most of its category is reported as a characteristic, not 
 test('duplicate findings report how many groups collided', () => {
   const { sections } = run();
   const f = finding(sections, 'clients', 'clients.duplicate.email');
-  assert.equal(f.groupCount, 1, 'two clients sharing one address is one collision');
+  assert.equal(f.groupCount, 2, 'two clients sharing one address is one collision');
+  assert.equal(f.total, 4);
+});
+
+test('one client or pet at several sites is listed, not reported as a duplicate', () => {
+  const { sections } = run();
+  for (const id of ['clients.duplicate.email', 'clients.duplicate.phone', 'clients.duplicate.nameDob']) {
+    assert.ok(!ids(sections, 'clients', id).some((c) => ['c0021', 'c0022'].includes(c)), `${id} flagged a multi-site client`);
+  }
+  assert.ok(!ids(sections, 'pets', 'pets.duplicate.microchip').some((p) => ['p20', 'p21'].includes(p)));
+  // Matched on email and on name + date of birth: still one group, listed once.
+  const f = finding(sections, 'clients', 'clients.multiSite');
+  assert.equal(f.groupCount, 1);
   assert.equal(f.total, 2);
+  assert.equal(f.severity, 'info');
+});
+
+test('archived clients and deceased pets are left out of duplicate matching', () => {
+  const { sections } = run();
+  assert.ok(!ids(sections, 'clients', 'clients.duplicate.email').includes('c0024'));
+  assert.ok(!ids(sections, 'pets', 'pets.duplicate.microchip').includes('p24'));
+});
+
+test('record links follow the environment the pull came from', async () => {
+  const { link } = await import('../src/links.js');
+  assert.equal(link('client', { id: 'c1' }, 'migrations').url, 'https://work.migrations.lupapets.com/clients/c1');
+  assert.equal(link('client', { id: 'c1' }, 'production').url, 'https://work.lupapets.com/clients/c1');
+  const { ctx, sections } = run();
+  const md = renderMarkdown(buildReport(ctx, sections));
+  assert.doesNotMatch(md, /https:\/\/work\.lupapets\.com/);
 });
 
 test('cross-record rules measure their share against what they actually scanned', () => {

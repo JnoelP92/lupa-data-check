@@ -27,6 +27,10 @@ while the review happens somewhere without it (a Cowork sandbox with closed egre
 - **A skipped rule is not a passing rule.** If a reference set fails to load, the rules
   depending on it are recorded in `skipped` and the report says so at the top. Never let
   an unavailable dependency render as a clean pass.
+- **Only report what is in the data.** Every finding comes from a rule and names or
+  links its record. No number or finding appears unless a rule produced it, and anything
+  that could not be checked says "not checked" — never a guess. The skill tells the
+  reviewing agent the same thing; keep the two in step.
 - **Never commit customer data.** `out/`, `*.jsonl`, `report.*` and `.env` are
   gitignored deliberately. Don't paste raw client rows into a message when a count or a
   redacted sample will do.
@@ -71,7 +75,7 @@ in Claude Code with no install step. After editing any `SKILL.md`, run
 ## Checks
 
 ```bash
-npm test                 # 55 tests, field and skill-drift checks included
+npm test                 # 60 tests, field and skill-drift checks included
 npm run sync:spec        # refresh spec-fields.json when the API moves
 npm run check:fields
 ```

@@ -4,6 +4,7 @@
 // short snippet, and snippets are stripped entirely from client-facing output — the
 // report is about data quality, not about surfacing what a vet wrote.
 import { isBlank, lower, breakdown } from '../util.js';
+import { workBase } from '../links.js';
 
 const MICROCHIP_IN_TEXT = /\b\d{15}\b/;
 const CLIENT_FACING_WORDS = /\b(client|owner|please tell|advise them)\b/i;
@@ -29,7 +30,7 @@ export default {
         ? ctx.ix.appointmentPet.get(note.entityId)
         : null;
     if (!petId || !ctx.ix.petIds.has(petId)) return { url: null };
-    return { url: `https://work.lupapets.com/pets/${petId}`, note: 'Notes tab' };
+    return { url: `${workBase(ctx.meta.environment)}/pets/${petId}`, note: 'Notes tab' };
   },
 
   tally(ctx, rows) {

@@ -64,7 +64,7 @@ test('the client report keeps the reconciliation totals and every Lupa link', ()
   const html = renderClientReport(report());
   assert.match(html, /Where the money stands/);
   assert.match(html, /Total invoiced/);
-  assert.match(html, /work\.lupapets\.com\/clients\//);
+  assert.match(html, /work\.migrations\.lupapets\.com\/clients\//);
 });
 
 test('the client report has contents links and a way back to the summary', () => {
@@ -146,7 +146,7 @@ test('the workbook carries record ids and clickable links', async () => {
   assert.match(sheet1, />Open in Lupa</, 'last column is the link');
 
   const rels = execFileSync('unzip', ['-p', join(dir, 'findings.xlsx'), 'xl/worksheets/_rels/sheet1.xml.rels'], { encoding: 'utf8' });
-  assert.match(rels, /work\.lupapets\.com/);
+  assert.match(rels, /work\.migrations\.lupapets\.com/);
   assert.match(rels, /TargetMode="External"/);
 });
 

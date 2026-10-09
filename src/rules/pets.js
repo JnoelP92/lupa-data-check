@@ -2,13 +2,30 @@
 //
 // Ownership lives on `clientsPets[]`, so "which store is this pet at" is derived
 // through the owning client rather than carried on the pet.
-import { isBlank, lower, breakdown, collisions, parseDate, plural } from '../util.js';
+import { isBlank, lower, breakdown, collisions, microchipKey, sameAcrossSites, parseDate, plural } from '../util.js';
 
 const MICROCHIP = /^\d{15}$/;
 const LONG_LIVED = { Dog: 20, Cat: 22, Rabbit: 12 };
 
 const owners = (p) => (p.clientsPets ?? []).map((cp) => cp.clientId).filter(Boolean);
 const live = (p) => p.deceased !== true && !(p.clientsPets ?? []).every((cp) => cp.isArchived === true);
+// Shared-chip matching ranges over live pets only: a deceased pet, or one whose every
+// owner link is archived, is an old record, not a second animal carrying the chip.
+//
+// A pet at a multi-site practice gets a record per site, under its owner's record at
+// that site, so the chip turns up once per site by design. A group is that case when
+// the pet and owner names match and each record's owner is at a different site; those
+// are listed by pets.multiSite rather than reported as a shared chip.
+const activeOwner = (p) => ((p.clientsPets ?? []).find((cp) => cp.isArchived !== true) ?? (p.clientsPets ?? [])[0])?.clientId ?? null;
+const ownerName = (ctx, p) => lower(ctx.ix.clientName.get(activeOwner(p))?.name);
+const samePetKey = (ctx) => (p) => {
+  const owner = ownerName(ctx, p);
+  const name = lower(p.name);
+  return owner && name ? `${owner}|${name}` : null;
+};
+const onePetManySites = (ctx, group) => sameAcrossSites(group, samePetKey(ctx), (p) => ctx.ix.clientStore.get(activeOwner(p)));
+const chipGroups = (rows) => collisions(rows.filter(live), (p) => microchipKey(p.microchip));
+
 const ageYears = (p, now) => {
   const d = parseDate(p.dob);
   return d ? (now - d) / (365.25 * 86_400_000) : null;
@@ -93,7 +110,7 @@ export default {
       id: 'pets.microchip.malformed', severity: 'review',
       title: 'Microchip number is not 15 digits',
       clientFacing: 'Microchip number does not look like a standard 15-digit chip.',
-      run: (ctx, rows) => rows.filter((p) => !isBlank(p.microchip) && !MICROCHIP.test(String(p.microchip).trim())).map((p) => ({
+      run: (ctx, rows) => rows.filter((p) => !isBlank(p.microchip) && !MICROCHIP.test(microchipKey(p.microchip))).map((p) => ({
         record: p, display: p.name ?? '(unnamed)', fields: { microchip: p.microchip },
       })),
     },
@@ -156,12 +173,32 @@ export default {
       title: 'Two pets share a microchip number',
       why: 'One of them is wrong, and the chip registry will disagree with Lupa either way.',
       group: true,
-      run: (ctx, rows) => collisions(rows, (p) => (isBlank(p.microchip) ? null : String(p.microchip).trim()))
+      run: (ctx, rows) => chipGroups(rows)
+        .filter(([, group]) => !onePetManySites(ctx, group))
         .flatMap(([key, group]) => group.map((p) => ({
           record: p, display: p.name ?? '(unnamed)', groupKey: key,
           fields: { species: p.species, microchip: p.microchip, owner: owners(p)[0] ?? '(none)' },
           reason: `Shared with ${group.length - 1} other`,
         }))),
+    },
+    {
+      id: 'pets.multiSite', severity: 'info',
+      title: 'Same pet registered at more than one site',
+      why: 'Same chip, same pet name, same owner name, one record per site. Expected for a multi-site practice, so not reported as a shared chip — listed so it can be confirmed.',
+      group: true,
+      run: (ctx, rows) => chipGroups(rows)
+        .filter(([, group]) => onePetManySites(ctx, group))
+        .flatMap(([key, group]) => {
+          const siteName = (p) => {
+            const id = ctx.ix.clientStore.get(activeOwner(p));
+            return ctx.storeNames.get(id) ?? id;
+          };
+          return group.map((p) => ({
+            record: p, display: p.name ?? '(unnamed)', groupKey: key,
+            fields: { species: p.species, microchip: p.microchip, owner: activeOwner(p), store: siteName(p) },
+            reason: `Also at ${group.filter((o) => o !== p).map(siteName).join(', ')}`,
+          }));
+        }),
     },
     {
       id: 'pets.duplicate.sameOwner', severity: 'review',
