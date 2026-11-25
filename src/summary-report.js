@@ -32,6 +32,8 @@ const INVOICE_COUNTED = new Set(['completed']);
 const PAYMENT_COUNTED = new Set(['completed', 'captured', 'authorized', 'refunded']);
 const CREDIT_COUNTED = new Set(['issued']);
 const REFUND_COUNTED = new Set(['completed']);
+// Appointments that actually happened, as opposed to booked, cancelled or missed.
+const ATTENDED = new Set(['completed', 'checked_in', 'in_progress', 'checked_out', 'discharged']);
 
 const SPECIES = (s) => {
   const v = lower(s);
@@ -162,7 +164,7 @@ export function buildSummary(dir, { now = new Date(), goLive, migrated, asOf } =
 
   const period = Object.fromEntries(PERIODS.map((m) => [m, {
     invoices: 0, invoiced: 0, credits: 0, creditCount: 0, payments: 0, paymentCount: 0,
-    refunds: 0, refundCount: 0, appointments: 0,
+    refunds: 0, refundCount: 0, appointments: 0, attended: 0,
   }]));
 
   for (const i of counted) {
@@ -226,7 +228,8 @@ export function buildSummary(dir, { now = new Date(), goLive, migrated, asOf } =
     const main = (a.employees ?? []).find((e) => e.isMainEmployee) ?? (a.employees ?? [])[0];
     if (a.storeInvoiceId && main?.id) vetByInvoice.set(a.storeInvoiceId, main.id);
     if (!start) continue;
-    for (const m of PERIODS) if (inPeriod(start, m)) period[m].appointments++;
+    const done = ATTENDED.has(lower(statusNames.get(a.status) ?? a.status));
+    for (const m of PERIODS) if (inPeriod(start, m)) { period[m].appointments++; if (done) period[m].attended++; }
     if (inPeriod(start, 12)) {
       const s = statusNames.get(a.status) ?? a.status ?? 'not recorded';
       appointments.byStatus.set(s, (appointments.byStatus.get(s) ?? 0) + 1);
@@ -286,17 +289,18 @@ export function buildSummary(dir, { now = new Date(), goLive, migrated, asOf } =
     for (const i of invoices) if (!INVOICE_COUNTED.has(i.status)) s.set(i.status || 'no status', (s.get(i.status || 'no status') ?? 0) + 1);
     notes.push(`Revenue counts finalised (completed) invoices only. ${excluded.toLocaleString()} others are left out: ${[...s.entries()].map(([k, v]) => `${v.toLocaleString()} ${k}`).join(', ')}.`);
   }
-  if (basis.creator + basis.none > 0 && counted.length) {
-    const yr = basis.appointment + basis.invoice + basis.creator + basis.none;
-    if (basis.creator + basis.none > yr * 0.25) {
-      notes.push(`Revenue by vet: ${Math.round(((basis.appointment + basis.invoice) / yr) * 100)}% of the year's invoices name a clinician directly. The rest fall back to whoever raised the invoice${basis.none ? ', or are shown as not attributed' : ''}, so treat that chart as indicative.`);
-    }
+  const yr = basis.appointment + basis.invoice + basis.creator + basis.none;
+  if (yr && basis.none > yr * 0.05) {
+    notes.push(`Revenue by vet: ${Math.round((basis.none / yr) * 100)}% of the last 12 months' invoices (${basis.none.toLocaleString()}) have no clinician recorded on the invoice or its appointment, and are shown as "Not attributed".`);
+  }
+  if (yr && basis.creator > yr * 0.25) {
+    notes.push(`Revenue by vet: ${Math.round((basis.creator / yr) * 100)}% of the last 12 months' invoices are attributed to whoever raised them, as no clinician is recorded. Treat that chart as indicative.`);
   }
   const future = counted.filter((i) => i.date > now).length;
   if (future) notes.push(`${future.toLocaleString()} finalised invoice${future === 1 ? ' is' : 's are'} dated in the future and left out of every period.`);
   const EXPECTED = { medicalRecords: 'medical records', clinicalNotes: 'clinical notes', prescriptions: 'prescriptions', appointments: 'appointments', invoices: 'invoices', payments: 'payments', products: 'products', services: 'services' };
   const empty = Object.entries(EXPECTED).filter(([k]) => pulled(k) && !store.sample(k, 1).length).map(([, v]) => v);
-  if (empty.length) notes.push(`No ${empty.join(', ')} were found in Lupa. If the old system held these, they have not come across (or not yet) — a zero here is not a clean result.`);
+  if (empty.length) notes.push(`No ${empty.length > 1 ? `${empty.slice(0, -1).join(', ')} or ${empty[empty.length - 1]}` : empty[0]} were found in Lupa. If the old system held these, they have not come across (or not yet) — a zero here is not a clean result.`);
   if (unavailable.length) notes.push(`Could not be read from Lupa, so not counted: ${unavailable.join(', ')}. These are shown as unavailable, not as zero.`);
 
   const n = (key, fn) => (pulled(key) ? fn() : null);
@@ -343,9 +347,15 @@ export function buildSummary(dir, { now = new Date(), goLive, migrated, asOf } =
 
   const outstanding = counted.reduce((t, i) => t + Math.max(0, i.value - i.paid), 0);
 
+  // Company names are sometimes stored as a slug (veterinary_care_of_ossining). A
+  // single-store practice's store name is what the practice actually calls itself.
+  const storeNames = (meta.stores ?? []).map((st) => st.name).filter(Boolean);
+  const rawName = meta.company?.name ?? 'Practice';
+  const displayName = !/\s/.test(rawName) && storeNames.length === 1 ? storeNames[0] : rawName;
+
   return {
     generatedAt: now.toISOString(),
-    company: meta.company ?? { name: 'Practice' },
+    company: { ...(meta.company ?? {}), name: displayName },
     stores: (meta.stores ?? []).map((s) => s.name ?? s.id),
     environment: meta.environment ?? 'migrations',
     pulledAt: meta.finishedAt ?? meta.startedAt ?? null,
@@ -377,7 +387,7 @@ function fmtMoney(summary, v, { compact = false } = {}) {
   try {
     return new Intl.NumberFormat(LOCALE[summary.currency] ?? 'en-GB', {
       style: 'currency', currency: summary.currency,
-      ...(compact ? { notation: 'compact', maximumFractionDigits: 1 } : { maximumFractionDigits: 0 }),
+      ...(compact && Math.abs(n) >= 10_000 ? { notation: 'compact', maximumFractionDigits: 1 } : { maximumFractionDigits: 0 }),
     }).format(n);
   } catch {
     return n.toFixed(0);
@@ -431,7 +441,7 @@ function barChart({ labels, series, format, height = 190, width = 680, every = 1
 // Horizontal bars with the value written at the end of each — the right form for a
 // ranked list of names, which would not fit under vertical bars.
 function hBarChart({ items, format, width = 680, color }) {
-  const row = 24, pad = { l: 150, r: 92, t: 4 };
+  const row = 21, pad = { l: 170, r: 92, t: 2 };
   const height = pad.t + items.length * row + 4;
   const max = Math.max(1, ...items.map((i) => i.value));
   const w = width - pad.l - pad.r;
@@ -439,12 +449,12 @@ function hBarChart({ items, format, width = 680, color }) {
   items.forEach((it, i) => {
     const y = pad.t + i * row;
     const bw = Math.max(0, (it.value / max) * w);
-    out += `<text x="${pad.l - 10}" y="${y + 16}" class="lab" text-anchor="end">${esc(it.label.length > 22 ? `${it.label.slice(0, 21)}…` : it.label)}</text>`;
+    out += `<text x="${pad.l - 10}" y="${y + 15}" class="lab" text-anchor="end">${esc(it.label.length > 26 ? `${it.label.slice(0, 25)}…` : it.label)}</text>`;
     if (bw > 0.5) {
       const r = Math.min(4, bw);
-      out += `<path d="M${pad.l},${y + 4} H${pad.l + bw - r} Q${pad.l + bw},${y + 4} ${pad.l + bw},${y + 4 + r} V${y + 18 - r} Q${pad.l + bw},${y + 18} ${pad.l + bw - r},${y + 18} H${pad.l} Z" fill="${it.muted ? 'var(--muted-bar)' : color}"><title>${esc(`${it.label}: ${format(it.value)}`)}</title></path>`;
+      out += `<path d="M${pad.l},${y + 4} H${pad.l + bw - r} Q${pad.l + bw},${y + 4} ${pad.l + bw},${y + 4 + r} V${y + 17 - r} Q${pad.l + bw},${y + 17} ${pad.l + bw - r},${y + 17} H${pad.l} Z" fill="${it.muted ? 'var(--muted-bar)' : color}"><title>${esc(`${it.label}: ${format(it.value)}`)}</title></path>`;
     }
-    out += `<text x="${pad.l + bw + 8}" y="${y + 16}" class="val">${esc(format(it.value))}</text>`;
+    out += `<text x="${pad.l + bw + 8}" y="${y + 15}" class="val">${esc(format(it.value))}</text>`;
   });
   return out + '</svg>';
 }
@@ -509,12 +519,13 @@ td.num, th.num { text-align: right; }
 tr.strong td { font-weight: 700; }
 tr.sub td:first-child { padding-left: 18px; color: var(--muted); }
 .na { color: var(--muted); font-style: italic; font-weight: 400; }
+.activity td:first-child { white-space: nowrap; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 @media screen and (max-width: 220mm) { .grid2, .tiles, .tiles.four, .cover-meta { grid-template-columns: 1fr 1fr; } }
 .card { border: 1px solid var(--line); border-radius: 8px; padding: 2px 12px 6px; break-inside: avoid; font-size: 9.5pt; }
 .card td, .card th { padding: 2.5px 4px; }
 .stack > * + * { margin-top: 10px; }
-.vets td { font-size: 9pt; } .vets td:first-child { white-space: nowrap; }
+.vets th, .vets td { font-size: 8.5pt; padding: 2.5px 5px; } .vets th { font-size: 7pt; } .vets td:first-child { white-space: nowrap; }
 .card h3 { margin-top: 10px; }
 .species td.num { width: 22%; }
 
@@ -563,7 +574,7 @@ export function renderSummaryReport(s, { preparedBy } = {}) {
   <div class="tile"><div class="k">Active patients</div><div class="v">${fmtN(activePets)}</div><div class="s">of ${fmtN(s.pets.total)} converted</div></div>
   <div class="tile"><div class="k">Invoiced, last 12 months</div><div class="v">${m(p12.invoiced)}</div><div class="s">${fmtN(p12.invoices)} finalised invoices</div></div>
   <div class="tile"><div class="k">Average invoice</div><div class="v">${m(s.averageInvoice[12])}</div><div class="s">median ${m(s.medianInvoice)}</div></div>
-  <div class="tile"><div class="k">Appointments, last 12 months</div><div class="v">${fmtN(p12.appointments)}</div><div class="s">${fmtN(s.appointments.future)} booked ahead</div></div>
+  <div class="tile"><div class="k">Appointments, 12 months</div><div class="v">${fmtN(p12.appointments)}</div><div class="s">${fmtN(p12.attended)} attended · ${fmtN(s.appointments.future)} booked ahead</div></div>
   <div class="tile"><div class="k">Outstanding on invoices</div><div class="v">${m(s.outstanding)}</div><div class="s">${fmtN(s.clients.inDebt)} clients owe money</div></div>
 </div>
 
@@ -666,7 +677,7 @@ ${foot}</section>`;
   const top = s.vets.slice(0, 12);
   const page4 = `<section class="sheet">${band(4)}
 <h2>Revenue by vet and activity</h2>
-<p class="lede">Finalised invoice value over the last 12 months, attributed to the clinician on the appointment the invoice belongs to where there is one, otherwise to the clinician carried on the invoice, otherwise to whoever raised it.</p>
+<p class="lede">Finalised invoice value over the last 12 months, credited to the clinician on the invoice's appointment, else the clinician on the invoice, else whoever raised it.</p>
 
 ${top.length ? hBarChart({
     items: top.map((v) => ({ label: v.name, value: v.value, muted: v.id === '__none__' })),
@@ -682,24 +693,25 @@ ${top.length ? hBarChart({
   </tbody>
 </table>
 
-<div class="grid2" style="margin-top:14px">
+<div class="grid2" style="margin-top:10px">
   <div>
     <h3 style="margin-top:0">Appointments per month</h3>
     ${barChart({
       labels: monthsLab,
       series: [{ name: 'Appointments', color: 'var(--brand)', values: s.monthly.map((r) => r.appointments) }],
       format: (v) => Math.round(v).toLocaleString('en-GB'),
-      height: 200, width: 360, every: 3,
+      height: 180, width: 360, every: 3,
     })}
+    ${s.appointments.byStatus.length ? `<h3 style="margin-top:8px">Appointment status, 12 months</h3><table><tbody>${s.appointments.byStatus.slice(0, 3).map(([k, v]) => `<tr><td>${esc(String(k).replace(/_/g, ' '))}</td><td class="num">${fmtN(v)}</td></tr>`).join('')}</tbody></table>` : ''}
   </div>
   <div>
     <h3 style="margin-top:0">Activity by period</h3>
-    <table><thead><tr><th></th>${P.map((k) => `<th class="num">${k}m</th>`).join('')}</tr></thead><tbody>
-      <tr><td>Appointments</td>${P.map((k) => `<td class="num">${fmtN(s.period[k].appointments)}</td>`).join('')}</tr>
+    <table class="activity"><thead><tr><th></th>${P.map((k) => `<th class="num">${k}m</th>`).join('')}</tr></thead><tbody>
+      <tr><td>Booked</td>${P.map((k) => `<td class="num">${fmtN(s.period[k].appointments)}</td>`).join('')}</tr>
+      <tr class="sub"><td>attended</td>${P.map((k) => `<td class="num">${fmtN(s.period[k].attended)}</td>`).join('')}</tr>
       <tr><td>Invoices</td>${P.map((k) => `<td class="num">${fmtN(s.period[k].invoices)}</td>`).join('')}</tr>
       <tr class="strong"><td>Avg invoice</td>${P.map((k) => `<td class="num">${m(s.averageInvoice[k])}</td>`).join('')}</tr>
     </tbody></table>
-    ${s.appointments.byStatus.length ? `<h3>Appointment status, last 12 months</h3><table><tbody>${s.appointments.byStatus.slice(0, 6).map(([k, v]) => `<tr><td>${esc(String(k).replace(/_/g, ' '))}</td><td class="num">${fmtN(v)}</td></tr>`).join('')}</tbody></table>` : ''}
   </div>
 </div>
 ${foot}</section>`;
