@@ -24,7 +24,14 @@ bin/lupa-check key                   # hidden prompt, verified before it is stor
 bin/lupa-check whoami                # which practice is this key for?
 bin/lupa-check run --env migrations  # pull, rules, report
 bin/lupa-check deliverables          # client report, Dock copy, email, tickets
+bin/lupa-check summary --go-live 2026-12-01   # preliminary data report: counts, financials
 ```
+
+`summary` writes `summary-report.html` (four A4 pages: summary, records converted,
+financials over 1/3/6/12 months, revenue by vet and appointment volumes) and
+`summary.json` with every figure on it. The title is prefixed with the go-live date, or
+with the migration date inferred from the data when `--go-live` is not given. Print the
+HTML to PDF to share it.
 
 `deliverables` reads an optional `verdicts.json` next to the report, written after the
 deployment team has been through the findings:
@@ -133,6 +140,7 @@ Do not try to route around the proxy. Ask for the allowlist entry.
 | `src/store.js` | on-disk pull format (JSONL + checkpoints) and reader |
 | `src/rules/` | one module per record type |
 | `src/report.js` | report.json and report.md |
+| `src/summary-report.js` | the preliminary data report: record counts and financials |
 | `references/ruleset-v1.md` | the ruleset, and which parts are actually implemented |
 | `plugin/` | the installable plugin: manifest and the two skills |
 | `test/` | fixture-driven rule tests — no key, no network |
@@ -160,7 +168,7 @@ redacted sample will do.
 ## Checks
 
 ```bash
-npm test                 # 55 tests, includes the field and skill-drift checks
+npm test                 # 62 tests, includes the field and skill-drift checks
 npm run check:fields     # do the rules read fields the API actually returns?
 npm run sync:spec        # refresh spec-fields.json from the live OpenAPI spec
 npm run sync:skills      # after editing a SKILL.md, copy it to .claude/skills/

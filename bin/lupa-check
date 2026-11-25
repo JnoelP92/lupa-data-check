@@ -7,6 +7,7 @@
 //   lupa-check check   [--out DIR]     run the ruleset over a pull, write the report
 //   lupa-check run     [--out DIR]     pull then check
 //   lupa-check deliverables [--out DIR] client report, Dock copy, email draft, tickets
+//   lupa-check summary [--out DIR]     preliminary data report: counts and financials
 //
 // Common flags:
 //   --env migrations|production        default: migrations
@@ -31,6 +32,7 @@ import { buildContext, runRules } from '../src/rules/index.js';
 import { buildReport, writeReport } from '../src/report.js';
 import { writeClientReport } from '../src/client-report.js';
 import { writeDeliverables, buildWorkbook } from '../src/deliverables.js';
+import { writeSummaryReport } from '../src/summary-report.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -56,6 +58,8 @@ function usage() {
   lupa-check check   [--out DIR]     run the ruleset, write report.json + report.md
   lupa-check run     [--out DIR]     pull then check
   lupa-check deliverables           client report, Dock copy, email, Linear export
+  lupa-check summary                preliminary data report: record counts, financials
+      [--go-live YYYY-MM-DD] [--migrated YYYY-MM-DD] [--as-of YYYY-MM-DD] [--by NAME]
 
   --env migrations|production   default: migrations
   --company <uuid>              only if the key sees several companies
@@ -199,6 +203,18 @@ try {
       console.error(`\nWrote:\n  ${html}\n  ${rest.dock}\n  ${rest.email}${rest.linear ? `\n  ${rest.linear}` : ''}`
         + (workbook ? `\n  ${workbook.path} (${workbook.sheets} sheets, ${workbook.rows.toLocaleString()} rows)` : ''));
       console.error('\nPrint report-client.html to PDF for the client-facing copy.');
+      break;
+    }
+
+    case 'summary': {
+      const dir = outDir(args);
+      const str = (v) => (typeof v === 'string' ? v : undefined);
+      const { html, json, summary } = writeSummaryReport(dir, {
+        goLive: str(args['go-live']), migrated: str(args.migrated), asOf: str(args['as-of']), preparedBy: str(args.by),
+      });
+      console.error(`${summary.company.name}: ${summary.clients.total.toLocaleString()} clients, ${summary.pets.total.toLocaleString()} patients, trading to ${summary.window.end}`);
+      for (const n of summary.notes) console.error(`  NOTE: ${n}`);
+      console.error(`\nWrote:\n  ${html}\n  ${json}\n\nPrint summary-report.html to PDF (A4) for the shareable copy.`);
       break;
     }
 

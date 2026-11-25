@@ -71,7 +71,7 @@ in Claude Code with no install step. After editing any `SKILL.md`, run
 ## Checks
 
 ```bash
-npm test                 # 55 tests, field and skill-drift checks included
+npm test                 # 62 tests, field and skill-drift checks included
 npm run sync:spec        # refresh spec-fields.json when the API moves
 npm run check:fields
 ```
