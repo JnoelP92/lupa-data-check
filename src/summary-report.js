@@ -136,6 +136,7 @@ export function buildSummary(dir, { now = new Date(), goLive, migrated, asOf } =
   // ---- Trading window --------------------------------------------------------------
 
   const invoices = [];
+  const invoiceCreated = [];
   for (const i of rows(store, 'invoices')) {
     const date = parseDate(i.activeFrom) ?? parseDate(i.createdAt);
     invoices.push({
@@ -143,6 +144,7 @@ export function buildSummary(dir, { now = new Date(), goLive, migrated, asOf } =
       value: Number(i.amountDue ?? 0), paid: Number(i.amountPaid ?? 0),
       vets: i.appointmentEmployeeIds ?? [], createdBy: i.createdByEmployeeId,
     });
+    invoiceCreated.push(parseDate(i.createdAt));
   }
   const counted = invoices.filter((i) => INVOICE_COUNTED.has(i.status) && i.date);
 
@@ -265,7 +267,11 @@ export function buildSummary(dir, { now = new Date(), goLive, migrated, asOf } =
 
   // ---- Dates, and what they say about the data -----------------------------------
 
-  const migratedDay = migrated ?? modalDay(clientCreated.filter(Boolean))?.day ?? null;
+  // Clients usually keep their original creation date from the old system, so no single
+  // collection can be trusted for this. The migration day is the one that stamps by far
+  // the most records across all of them — and only if it stands out at all.
+  const stamped = modalDay([...clientCreated, ...invoiceCreated, ...apptCreated].filter(Boolean));
+  const migratedDay = migrated ?? (stamped && stamped.share >= 0.1 ? stamped.day : null);
   const migratedDate = migratedDay ? new Date(`${migratedDay}T12:00:00Z`) : null;
   const goLiveDate = goLive ? new Date(`${goLive}T12:00:00Z`) : null;
 
@@ -286,6 +292,11 @@ export function buildSummary(dir, { now = new Date(), goLive, migrated, asOf } =
       notes.push(`Revenue by vet: ${Math.round(((basis.appointment + basis.invoice) / yr) * 100)}% of the year's invoices name a clinician directly. The rest fall back to whoever raised the invoice${basis.none ? ', or are shown as not attributed' : ''}, so treat that chart as indicative.`);
     }
   }
+  const future = counted.filter((i) => i.date > now).length;
+  if (future) notes.push(`${future.toLocaleString()} finalised invoice${future === 1 ? ' is' : 's are'} dated in the future and left out of every period.`);
+  const EXPECTED = { medicalRecords: 'medical records', clinicalNotes: 'clinical notes', prescriptions: 'prescriptions', appointments: 'appointments', invoices: 'invoices', payments: 'payments', products: 'products', services: 'services' };
+  const empty = Object.entries(EXPECTED).filter(([k]) => pulled(k) && !store.sample(k, 1).length).map(([, v]) => v);
+  if (empty.length) notes.push(`No ${empty.join(', ')} were found in Lupa. If the old system held these, they have not come across (or not yet) — a zero here is not a clean result.`);
   if (unavailable.length) notes.push(`Could not be read from Lupa, so not counted: ${unavailable.join(', ')}. These are shown as unavailable, not as zero.`);
 
   const n = (key, fn) => (pulled(key) ? fn() : null);
