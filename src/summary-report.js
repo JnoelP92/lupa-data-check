@@ -216,17 +216,23 @@ export function buildSummary(dir, { now = new Date(), goLive, migrated, asOf } =
   // ---- Appointments, and the vet behind each invoice ---------------------------------
 
   const statusNames = new Map((store.readJson('appointmentStatuses', []) ?? []).map((s) => [s.id, s.name ?? s.label ?? s.id]));
-  const appointments = { total: 0, historic: 0, future: 0, migrated: 0, byStatus: new Map() };
+  const appointments = { total: 0, historic: 0, future: 0, migrated: 0, placeholders: 0, byStatus: new Map() };
   const vetByInvoice = new Map();
   const apptCreated = [];
   for (const a of rows(store, 'appointments')) {
-    appointments.total++;
     const start = parseDate(a.start);
+    const main = (a.employees ?? []).find((e) => e.isMainEmployee) ?? (a.employees ?? [])[0];
+    if (a.storeInvoiceId && main?.id) vetByInvoice.set(a.storeInvoiceId, main.id);
+    // A migration that has to hang each historic invoice off an appointment creates one:
+    // still "requested", long in the past, existing only to carry the invoice. Counted as
+    // visits they inflate the diary by tens of thousands, so they are kept for vet
+    // attribution above and left out of every appointment figure.
+    if (lower(a.createdFrom) === 'migration' && lower(statusNames.get(a.status) ?? a.status) === 'requested'
+      && a.storeInvoiceId && start && start < now) { appointments.placeholders++; continue; }
+    appointments.total++;
     if (start && start > now) appointments.future++; else appointments.historic++;
     if (lower(a.createdFrom) === 'migration') appointments.migrated++;
     apptCreated.push(parseDate(a.createdAt));
-    const main = (a.employees ?? []).find((e) => e.isMainEmployee) ?? (a.employees ?? [])[0];
-    if (a.storeInvoiceId && main?.id) vetByInvoice.set(a.storeInvoiceId, main.id);
     if (!start) continue;
     const done = ATTENDED.has(lower(statusNames.get(a.status) ?? a.status));
     for (const m of PERIODS) if (inPeriod(start, m)) { period[m].appointments++; if (done) period[m].attended++; }
@@ -267,6 +273,19 @@ export function buildSummary(dir, { now = new Date(), goLive, migrated, asOf } =
       byPeriod: Object.fromEntries(PERIODS.map((m) => [m, byVet[m].get(id)?.value ?? 0])),
     }))
     .sort((a, b) => (a.id === '__none__') - (b.id === '__none__') || b.value - a.value);
+  // Legacy logins ("Relief DVM", "Refill") carry a sliver of revenue each and read as
+  // noise next to the clinicians. Anyone under 1% of the year folds into one row.
+  const yearTotal = vets.reduce((t, v) => t + v.value, 0);
+  const small = vets.filter((v) => v.id !== '__none__' && yearTotal && v.value / yearTotal < 0.01);
+  if (small.length > 1) {
+    const other = {
+      id: '__other__', name: `Other staff (${small.length})`, role: '', muted: true,
+      invoices: small.reduce((t, v) => t + v.invoices, 0), value: small.reduce((t, v) => t + v.value, 0),
+      byPeriod: Object.fromEntries(PERIODS.map((m) => [m, small.reduce((t, v) => t + v.byPeriod[m], 0)])),
+    };
+    const none = vets.filter((v) => v.id === '__none__');
+    vets.splice(0, vets.length, ...vets.filter((v) => !small.includes(v) && v.id !== '__none__'), other, ...none);
+  }
 
   // ---- Dates, and what they say about the data -----------------------------------
 
@@ -287,20 +306,21 @@ export function buildSummary(dir, { now = new Date(), goLive, migrated, asOf } =
   if (excluded) {
     const s = new Map();
     for (const i of invoices) if (!INVOICE_COUNTED.has(i.status)) s.set(i.status || 'no status', (s.get(i.status || 'no status') ?? 0) + 1);
-    notes.push(`Revenue counts finalised (completed) invoices only. ${excluded.toLocaleString()} others are left out: ${[...s.entries()].map(([k, v]) => `${v.toLocaleString()} ${k}`).join(', ')}.`);
+    notes.push(`Invoice counts and revenue are finalised invoices only. ${[...s.entries()].map(([k, v]) => `${v.toLocaleString()} ${k}`).join(' and ')} invoices are left out.`);
   }
   const yr = basis.appointment + basis.invoice + basis.creator + basis.none;
   if (yr && basis.none > yr * 0.05) {
-    notes.push(`Revenue by vet: ${Math.round((basis.none / yr) * 100)}% of the last 12 months' invoices (${basis.none.toLocaleString()}) have no clinician recorded on the invoice or its appointment, and are shown as "Not attributed".`);
+    notes.push(`${Math.round((basis.none / yr) * 100)}% of the last 12 months' invoices have no clinician recorded, and show as "Not attributed" in revenue by vet.`);
   }
   if (yr && basis.creator > yr * 0.25) {
     notes.push(`Revenue by vet: ${Math.round((basis.creator / yr) * 100)}% of the last 12 months' invoices are attributed to whoever raised them, as no clinician is recorded. Treat that chart as indicative.`);
   }
+  if (appointments.placeholders) notes.push(`${appointments.placeholders.toLocaleString()} placeholder appointments the migration created to hold historic invoices are left out of all appointment figures.`);
   const future = counted.filter((i) => i.date > now).length;
   if (future) notes.push(`${future.toLocaleString()} finalised invoice${future === 1 ? ' is' : 's are'} dated in the future and left out of every period.`);
   const EXPECTED = { medicalRecords: 'medical records', clinicalNotes: 'clinical notes', prescriptions: 'prescriptions', appointments: 'appointments', invoices: 'invoices', payments: 'payments', products: 'products', services: 'services' };
   const empty = Object.entries(EXPECTED).filter(([k]) => pulled(k) && !store.sample(k, 1).length).map(([, v]) => v);
-  if (empty.length) notes.push(`No ${empty.length > 1 ? `${empty.slice(0, -1).join(', ')} or ${empty[empty.length - 1]}` : empty[0]} were found in Lupa. If the old system held these, they have not come across (or not yet) — a zero here is not a clean result.`);
+  if (empty.length) notes.push(`No ${empty.length > 1 ? `${empty.slice(0, -1).join(', ')} or ${empty[empty.length - 1]}` : empty[0]} were found in Lupa. If the old system held them, they have not come across yet.`);
   if (unavailable.length) notes.push(`Could not be read from Lupa, so not counted: ${unavailable.join(', ')}. These are shown as unavailable, not as zero.`);
 
   const n = (key, fn) => (pulled(key) ? fn() : null);
@@ -318,7 +338,9 @@ export function buildSummary(dir, { now = new Date(), goLive, migrated, asOf } =
       { label: 'Products — active', value: n('products', () => products.active) },
       { label: 'Products — archived', value: n('products', () => products.archived) },
       { label: 'Products — prescription only', value: n('products', () => products.prescriptionOnly) },
-      { label: 'Services', value: n('services', () => count(store, 'services')) },
+      // Practices often carry a lab's whole test catalogue as services, nearly all of it
+      // archived (one had 10,531 of 11,187). Only the live list means anything.
+      { label: 'Services — active', value: n('services', () => { let k = 0; for (const x of rows(store, 'services')) if (x.isArchived !== true) k++; return k; }) },
       { label: 'Bundles', value: n('bundles', () => count(store, 'bundles')) },
       { label: 'Health plans', value: n('healthPlans', () => count(store, 'healthPlans')) },
       { label: 'Health plan subscriptions', value: n('healthPlanSubscriptions', () => count(store, 'healthPlanSubscriptions')) },
@@ -336,8 +358,7 @@ export function buildSummary(dir, { now = new Date(), goLive, migrated, asOf } =
       { label: 'Staff records', value: employees.length },
     ] },
     { group: 'Financial', items: [
-      { label: 'Invoices', value: n('invoices', () => invoices.length) },
-      { label: '… finalised', value: n('invoices', () => counted.length) },
+      { label: 'Invoices — finalised', value: n('invoices', () => counted.length) },
       { label: 'Payments', value: n('payments', () => payDates.length) },
       { label: 'Credit notes', value: n('creditNotes', () => count(store, 'creditNotes')) },
       { label: 'Refunds', value: n('refunds', () => count(store, 'refunds')) },
@@ -503,7 +524,7 @@ h3 { font-size: 9pt; text-transform: uppercase; letter-spacing: .08em; color: va
 .tile .s { font-size: 8.5pt; color: var(--muted); }
 
 .contents { list-style: none; padding: 0; margin: 0; counter-reset: c; }
-.contents li { display: flex; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); counter-increment: c; }
+.contents li { display: flex; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--line); counter-increment: c; }
 .contents li::before { content: counter(c); font-weight: 700; color: var(--brand); width: 18px; }
 .contents .t { font-weight: 600; } .contents .d { color: var(--muted); font-size: 9.5pt; }
 .contents .p { margin-left: auto; color: var(--muted); font-size: 9pt; white-space: nowrap; }
@@ -593,7 +614,7 @@ ${foot}</section>`;
   const sp = s.pets.species;
   const speciesRows = ['Dog', 'Cat', 'Other'].map((k) => `<tr><td>${k}</td><td class="num">${fmtN(sp[k].active)}</td><td class="num">${fmtN(sp[k].inactive)}</td><td class="num"><b>${fmtN(sp[k].active + sp[k].inactive)}</b></td></tr>`).join('');
   const spTotal = ['Dog', 'Cat', 'Other'].reduce((t, k) => ({ a: t.a + sp[k].active, i: t.i + sp[k].inactive }), { a: 0, i: 0 });
-  const group = (g) => `<div class="card"><h3>${esc(g.group)}</h3><table><tbody>${g.items.map((it) => `<tr class="${it.strong ? 'strong' : ''}${it.label.startsWith('…') ? ' sub' : ''}"><td>${esc(it.label.replace(/^… /, ''))}</td><td class="num">${fmtN(it.value)}</td></tr>`).join('')}</tbody></table></div>`;
+  const group = (g) => `<div class="card"><h3>${esc(g.group)}</h3><table><tbody>${g.items.filter((it) => it.value !== 0).map((it) => `<tr class="${it.strong ? 'strong' : ''}${it.label.startsWith('…') ? ' sub' : ''}"><td>${esc(it.label.replace(/^… /, ''))}</td><td class="num">${fmtN(it.value)}</td></tr>`).join('')}</tbody></table></div>`;
   const byGroup = Object.fromEntries(s.records.map((g) => [g.group, g]));
 
   const page2 = `<section class="sheet">${band(2)}
@@ -604,7 +625,7 @@ ${foot}</section>`;
   <div class="tile"><div class="k">Clients</div><div class="v">${fmtN(s.clients.total)}</div><div class="s">${fmtN(s.clients.active)} active · ${fmtN(s.clients.archived)} inactive</div></div>
   <div class="tile"><div class="k">Patients</div><div class="v">${fmtN(s.pets.total)}</div><div class="s">${fmtN(spTotal.a)} active · ${fmtN(spTotal.i)} inactive</div></div>
   <div class="tile"><div class="k">Products</div><div class="v">${fmtN(s.products.total)}</div><div class="s">${fmtN(s.products.active)} active</div></div>
-  <div class="tile"><div class="k">Invoices</div><div class="v">${fmtN(byGroup.Financial.items[0].value)}</div><div class="s">${fmtN(byGroup.Financial.items[1].value)} finalised</div></div>
+  <div class="tile"><div class="k">Invoices</div><div class="v">${fmtN(byGroup.Financial.items[0].value)}</div><div class="s">finalised</div></div>
 </div>
 
 <div class="grid2" style="margin-top:12px">
@@ -680,7 +701,7 @@ ${foot}</section>`;
 <p class="lede">Finalised invoice value over the last 12 months, credited to the clinician on the invoice's appointment, else the clinician on the invoice, else whoever raised it.</p>
 
 ${top.length ? hBarChart({
-    items: top.map((v) => ({ label: v.name, value: v.value, muted: v.id === '__none__' })),
+    items: top.map((v) => ({ label: v.name, value: v.value, muted: v.id === '__none__' || v.id === '__other__' })),
     format: (v) => m(v),
     color: 'var(--brand)',
   }) : '<p class="na">No finalised invoices in the last 12 months.</p>'}

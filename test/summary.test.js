@@ -41,3 +41,22 @@ test('the report is titled with the go-live date when given, and renders cleanly
   assert.doesNotMatch(html, /NaN|undefined|Infinity/);
   assert.equal((html.match(/class="sheet"/g) ?? []).length, 4);
 });
+
+test('migration placeholder appointments and archived services are left out of the counts', () => {
+  const placeholder = (id) => ({
+    id, start: '2026-08-01T09:00:00Z', status: 'requested', createdFrom: 'migration',
+    storeInvoiceId: 'in01', employees: [{ id: 'e01', isMainEmployee: true }],
+  });
+  const real = { id: 'ap-real', start: '2026-08-02T09:00:00Z', status: 'completed', createdFrom: 'migration', employees: [] };
+  const s = buildSummary(makePull({
+    overrides: {
+      appointments: [placeholder('ph1'), placeholder('ph2'), real],
+      services: [{ id: 's1', isArchived: false }, { id: 's2', isArchived: true }, { id: 's3', isArchived: true }],
+    },
+  }), { now: NOW });
+  assert.equal(s.appointments.placeholders, 2);
+  assert.equal(s.appointments.total, 1);
+  assert.ok(s.notes.some((n) => /placeholder/.test(n)));
+  const services = s.records.flatMap((g) => g.items).find((i) => i.label === 'Services — active');
+  assert.equal(services.value, 1);
+});

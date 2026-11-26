@@ -168,7 +168,7 @@ redacted sample will do.
 ## Checks
 
 ```bash
-npm test                 # 62 tests, includes the field and skill-drift checks
+npm test                 # 63 tests, includes the field and skill-drift checks
 npm run check:fields     # do the rules read fields the API actually returns?
 npm run sync:spec        # refresh spec-fields.json from the live OpenAPI spec
 npm run sync:skills      # after editing a SKILL.md, copy it to .claude/skills/
